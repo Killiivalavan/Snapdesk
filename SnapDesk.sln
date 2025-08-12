@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.Core", "SnapDesk.Core\SnapDesk.Core.csproj", "{F1E8A455-61F8-403B-92D1-649E3A3F8CC9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.Data", "SnapDesk.Data\SnapDesk.Data.csproj", "{AA15B869-F535-4908-850F-28DD9D327A93}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.Platform", "SnapDesk.Platform\SnapDesk.Platform.csproj", "{8853FEF6-2C55-481A-B4D5-587BDBB5E011}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.UI", "SnapDesk.UI\SnapDesk.UI.csproj", "{F1CF867F-C85A-4B92-AD45-1774E3CFDE97}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.Api", "SnapDesk.Api\SnapDesk.Api.csproj", "{6152623D-F27B-43DD-BE59-AE7F592A5615}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F1E8A455-61F8-403B-92D1-649E3A3F8CC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1E8A455-61F8-403B-92D1-649E3A3F8CC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1E8A455-61F8-403B-92D1-649E3A3F8CC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1E8A455-61F8-403B-92D1-649E3A3F8CC9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA15B869-F535-4908-850F-28DD9D327A93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA15B869-F535-4908-850F-28DD9D327A93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA15B869-F535-4908-850F-28DD9D327A93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA15B869-F535-4908-850F-28DD9D327A93}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8853FEF6-2C55-481A-B4D5-587BDBB5E011}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8853FEF6-2C55-481A-B4D5-587BDBB5E011}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8853FEF6-2C55-481A-B4D5-587BDBB5E011}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8853FEF6-2C55-481A-B4D5-587BDBB5E011}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F1CF867F-C85A-4B92-AD45-1774E3CFDE97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1CF867F-C85A-4B92-AD45-1774E3CFDE97}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1CF867F-C85A-4B92-AD45-1774E3CFDE97}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1CF867F-C85A-4B92-AD45-1774E3CFDE97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6152623D-F27B-43DD-BE59-AE7F592A5615}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6152623D-F27B-43DD-BE59-AE7F592A5615}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6152623D-F27B-43DD-BE59-AE7F592A5615}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6152623D-F27B-43DD-BE59-AE7F592A5615}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
