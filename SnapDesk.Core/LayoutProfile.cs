@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
 
 namespace SnapDesk.Core;
 
@@ -11,16 +13,21 @@ public class LayoutProfile
     /// <summary>
     /// Unique identifier for the layout
     /// </summary>
+    [Required]
+    [StringLength(50, MinimumLength = 1)]
     public string Id { get; set; } = string.Empty;
 
     /// <summary>
     /// User-friendly name for the layout (e.g., "Coding Setup", "Design Work")
     /// </summary>
+    [Required]
+    [StringLength(100, MinimumLength = 1)]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
     /// Optional description of what this layout is used for
     /// </summary>
+    [StringLength(500)]
     public string? Description { get; set; }
 
     /// <summary>
@@ -69,6 +76,7 @@ public class LayoutProfile
     public LayoutProfile(string name) : this()
     {
         Name = name;
+        Id = GenerateId();
     }
 
     /// <summary>
@@ -79,5 +87,151 @@ public class LayoutProfile
     public LayoutProfile(string name, string? description) : this(name)
     {
         Description = description;
+    }
+
+    /// <summary>
+    /// Generates a unique identifier for the layout
+    /// </summary>
+    /// <returns>Unique ID string</returns>
+    private string GenerateId()
+    {
+        return $"layout_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..8]}";
+    }
+
+    /// <summary>
+    /// Adds a window to this layout
+    /// </summary>
+    /// <param name="window">Window to add</param>
+    public void AddWindow(WindowInfo window)
+    {
+        if (window == null)
+            throw new ArgumentNullException(nameof(window));
+
+        // Check if window already exists
+        if (Windows.Any(w => w.WindowId == window.WindowId))
+            throw new InvalidOperationException($"Window with ID {window.WindowId} already exists in this layout");
+
+        Windows.Add(window);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Removes a window from this layout
+    /// </summary>
+    /// <param name="windowId">ID of the window to remove</param>
+    /// <returns>True if window was removed, false if not found</returns>
+    public bool RemoveWindow(string windowId)
+    {
+        var window = Windows.FirstOrDefault(w => w.WindowId == windowId);
+        if (window != null)
+        {
+            Windows.Remove(window);
+            UpdatedAt = DateTime.UtcNow;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Gets a window by its ID
+    /// </summary>
+    /// <param name="windowId">ID of the window to find</param>
+    /// <returns>Window if found, null otherwise</returns>
+    public WindowInfo? GetWindow(string windowId)
+    {
+        return Windows.FirstOrDefault(w => w.WindowId == windowId);
+    }
+
+    /// <summary>
+    /// Adds a monitor configuration to this layout
+    /// </summary>
+    /// <param name="monitor">Monitor to add</param>
+    public void AddMonitor(MonitorInfo monitor)
+    {
+        if (monitor == null)
+            throw new ArgumentNullException(nameof(monitor));
+
+        // Check if monitor already exists
+        if (MonitorConfiguration.Any(m => m.Index == monitor.Index))
+            throw new InvalidOperationException($"Monitor with index {monitor.Index} already exists in this layout");
+
+        MonitorConfiguration.Add(monitor);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Gets the primary monitor configuration
+    /// </summary>
+    /// <returns>Primary monitor if found, null otherwise</returns>
+    public MonitorInfo? GetPrimaryMonitor()
+    {
+        return MonitorConfiguration.FirstOrDefault(m => m.IsPrimary);
+    }
+
+    /// <summary>
+    /// Sets this layout as active and deactivates others
+    /// </summary>
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Deactivates this layout
+    /// </summary>
+    public void Deactivate()
+    {
+        IsActive = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Updates the layout's timestamp
+    /// </summary>
+    public void UpdateTimestamp()
+    {
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Gets the total number of windows in this layout
+    /// </summary>
+    public int WindowCount => Windows.Count;
+
+    /// <summary>
+    /// Gets the total number of monitors in this layout
+    /// </summary>
+    public int MonitorCount => MonitorConfiguration.Count;
+
+    /// <summary>
+    /// Checks if this layout has any windows
+    /// </summary>
+    public bool HasWindows => Windows.Count > 0;
+
+    /// <summary>
+    /// Checks if this layout has any monitors
+    /// </summary>
+    public bool HasMonitors => MonitorConfiguration.Count > 0;
+
+    /// <summary>
+    /// Gets a summary of this layout
+    /// </summary>
+    /// <returns>Formatted summary string</returns>
+    public string GetSummary()
+    {
+        return $"Layout '{Name}' with {WindowCount} windows on {MonitorCount} monitors";
+    }
+
+    /// <summary>
+    /// Validates the layout configuration
+    /// </summary>
+    /// <returns>True if valid, false otherwise</returns>
+    public bool IsValid()
+    {
+        return !string.IsNullOrWhiteSpace(Name) && 
+               !string.IsNullOrWhiteSpace(Id) && 
+               Windows.Count > 0 && 
+               MonitorConfiguration.Count > 0;
     }
 }

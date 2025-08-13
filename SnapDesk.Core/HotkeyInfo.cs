@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
 
 namespace SnapDesk.Core;
 
@@ -11,11 +13,15 @@ public class HotkeyInfo
     /// <summary>
     /// Unique identifier for the hotkey
     /// </summary>
+    [Required]
+    [StringLength(50, MinimumLength = 1)]
     public string Id { get; set; } = string.Empty;
 
     /// <summary>
     /// The key combination as a string (e.g., "Ctrl+Alt+1")
     /// </summary>
+    [Required]
+    [StringLength(50, MinimumLength = 1)]
     public string Keys { get; set; } = string.Empty;
 
     /// <summary>
@@ -26,6 +32,8 @@ public class HotkeyInfo
     /// <summary>
     /// The main key (e.g., "1", "F1", "A")
     /// </summary>
+    [Required]
+    [StringLength(10, MinimumLength = 1)]
     public string Key { get; set; } = string.Empty;
 
     /// <summary>
@@ -41,6 +49,7 @@ public class HotkeyInfo
     /// <summary>
     /// Optional layout ID if this hotkey is layout-specific
     /// </summary>
+    [StringLength(50)]
     public string? LayoutId { get; set; }
 
     /// <summary>
@@ -72,6 +81,7 @@ public class HotkeyInfo
     {
         Keys = keys;
         Action = action;
+        Id = GenerateId();
         ParseKeys(keys);
     }
 
@@ -87,12 +97,25 @@ public class HotkeyInfo
     }
 
     /// <summary>
+    /// Generates a unique identifier for the hotkey
+    /// </summary>
+    /// <returns>Unique ID string</returns>
+    private string GenerateId()
+    {
+        return $"hotkey_{Action}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..6]}";
+    }
+
+    /// <summary>
     /// Parses the key combination string into individual components
     /// </summary>
     /// <param name="keyString">Key combination string to parse</param>
     private void ParseKeys(string keyString)
     {
+        if (string.IsNullOrWhiteSpace(keyString))
+            throw new ArgumentException("Key string cannot be null or empty", nameof(keyString));
+
         var parts = keyString.Split('+');
+        Modifiers.Clear();
         
         foreach (var part in parts)
         {
@@ -107,6 +130,9 @@ public class HotkeyInfo
                 Key = trimmedPart;
             }
         }
+
+        if (string.IsNullOrWhiteSpace(Key))
+            throw new ArgumentException("No valid key found in key combination", nameof(keyString));
     }
 
     /// <summary>
@@ -128,7 +154,139 @@ public class HotkeyInfo
     /// <returns>True if there's a conflict</returns>
     public bool ConflictsWith(HotkeyInfo other)
     {
+        if (other == null) return false;
         return Keys.Equals(other.Keys, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Enables this hotkey
+    /// </summary>
+    public void Enable()
+    {
+        IsEnabled = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Disables this hotkey
+    /// </summary>
+    public void Disable()
+    {
+        IsEnabled = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Updates the key combination
+    /// </summary>
+    /// <param name="newKeys">New key combination</param>
+    public void UpdateKeys(string newKeys)
+    {
+        if (string.IsNullOrWhiteSpace(newKeys))
+            throw new ArgumentException("Key combination cannot be null or empty", nameof(newKeys));
+
+        Keys = newKeys;
+        ParseKeys(newKeys);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Updates the action
+    /// </summary>
+    /// <param name="newAction">New action</param>
+    public void UpdateAction(HotkeyAction newAction)
+    {
+        Action = newAction;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Associates this hotkey with a layout
+    /// </summary>
+    /// <param name="layoutId">Layout ID to associate with</param>
+    public void AssociateWithLayout(string layoutId)
+    {
+        LayoutId = layoutId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Removes the layout association
+    /// </summary>
+    public void RemoveLayoutAssociation()
+    {
+        LayoutId = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Checks if this hotkey is associated with a specific layout
+    /// </summary>
+    /// <param name="layoutId">Layout ID to check</param>
+    /// <returns>True if associated with the specified layout</returns>
+    public bool IsAssociatedWithLayout(string layoutId)
+    {
+        return !string.IsNullOrEmpty(LayoutId) && LayoutId.Equals(layoutId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Checks if this hotkey has any modifier keys
+    /// </summary>
+    /// <returns>True if has modifiers</returns>
+    public bool HasModifiers => Modifiers.Count > 0;
+
+    /// <summary>
+    /// Checks if this hotkey has a specific modifier
+    /// </summary>
+    /// <param name="modifier">Modifier to check for</param>
+    /// <returns>True if has the specified modifier</returns>
+    public bool HasModifier(ModifierKey modifier)
+    {
+        return Modifiers.Contains(modifier);
+    }
+
+    /// <summary>
+    /// Gets the number of modifier keys
+    /// </summary>
+    public int ModifierCount => Modifiers.Count;
+
+    /// <summary>
+    /// Checks if this hotkey is a simple key (no modifiers)
+    /// </summary>
+    /// <returns>True if simple key</returns>
+    public bool IsSimpleKey => Modifiers.Count == 0;
+
+    /// <summary>
+    /// Gets a summary of the hotkey
+    /// </summary>
+    /// <returns>Formatted summary string</returns>
+    public string GetSummary()
+    {
+        var layout = !string.IsNullOrEmpty(LayoutId) ? $" for layout {LayoutId}" : "";
+        var status = IsEnabled ? "Enabled" : "Disabled";
+        return $"{Action} hotkey: {Keys}{layout} ({status})";
+    }
+
+    /// <summary>
+    /// Validates the hotkey configuration
+    /// </summary>
+    /// <returns>True if valid, false otherwise</returns>
+    public bool IsValid()
+    {
+        return !string.IsNullOrWhiteSpace(Id) &&
+               !string.IsNullOrWhiteSpace(Keys) &&
+               !string.IsNullOrWhiteSpace(Key) &&
+               Modifiers.Count >= 0 &&
+               Enum.IsDefined(typeof(HotkeyAction), Action);
+    }
+
+    /// <summary>
+    /// Checks if this hotkey can be used
+    /// </summary>
+    /// <returns>True if hotkey is valid and enabled</returns>
+    public bool CanBeUsed()
+    {
+        return IsValid() && IsEnabled;
     }
 }
 
