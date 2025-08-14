@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using SnapDesk.Core;
+using SnapDesk.Shared;
 using SnapDesk.Platform.Interfaces;
 
 namespace SnapDesk.Platform.Common;
@@ -295,5 +295,23 @@ public class StubWindowApi : IWindowApi
 	{
 		error = "Window manipulation not supported on this platform.";
 		return false;
+	}
+
+	/// <summary>
+	/// Gets all top-level windows on the desktop.
+	/// </summary>
+	/// <returns>List of window handles for all top-level windows</returns>
+	public List<IntPtr> GetAllWindows()
+	{
+		// Return empty list on non-Windows platforms
+		return new List<IntPtr>();
+	}
+
+	/// <summary>
+	/// Returns no monitors on non-Windows platforms.
+	/// </summary>
+	public List<MonitorDescriptor> GetAllMonitors()
+	{
+		return new List<MonitorDescriptor>();
 	}
 }

@@ -12,4 +12,9 @@
     <PackageReference Include="System.Text.Json" Version="9.0.8" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SnapDesk.Shared\SnapDesk.Shared.csproj" />
+    <ProjectReference Include="..\SnapDesk.Platform\SnapDesk.Platform.csproj" />
+  </ItemGroup>
+
 </Project>

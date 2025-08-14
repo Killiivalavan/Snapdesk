@@ -92,8 +92,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 
                 try
                 {
-                    _logger.LogDebug("Connecting to database with connection string: {ConnectionString}", 
-                        _configuration.ConnectionString.Replace(_configuration.EncryptionPassword ?? "", "***"));
+                    var logConnectionString = _configuration.ConnectionString;
+                    if (!string.IsNullOrEmpty(_configuration.EncryptionPassword))
+                    {
+                        logConnectionString = logConnectionString.Replace(_configuration.EncryptionPassword, "***");
+                    }
+                    _logger.LogDebug("Connecting to database with connection string: {ConnectionString}", logConnectionString);
 
                     _database = new LiteDatabase(_configuration.ConnectionString);
 

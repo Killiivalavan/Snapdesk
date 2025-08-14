@@ -2,9 +2,11 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SnapDesk.Core;
+using SnapDesk.Core.Interfaces;
 using SnapDesk.Data.Configuration;
 using SnapDesk.Data.Repositories;
 using SnapDesk.Data.Services;
+using SnapDesk.Shared;
 
 namespace SnapDesk.Data.Initialization;
 

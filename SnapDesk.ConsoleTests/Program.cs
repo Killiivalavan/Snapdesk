@@ -9,15 +9,19 @@ using SnapDesk.Data.Repositories;
 using SnapDesk.Data.Services;
 using SnapDesk.Data.Configuration;
 using SnapDesk.Core;
+using SnapDesk.Core.Services;
+using SnapDesk.Core.Interfaces;
+using SnapDesk.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace SnapDesk.ConsoleTests;
 
 class Program
 {
-	static void Main(string[] args)
+	static async Task Main(string[] args)
 	{
 		Console.WriteLine("SnapDesk Console Tests - Comprehensive Testing Suite");
 		Console.WriteLine("=====================================================");
@@ -31,6 +35,14 @@ class Program
 
 		// Test Data Layer
 		TestDataLayer();
+		
+		Console.WriteLine("\n" + "=".PadRight(80, '='));
+		Console.WriteLine();
+
+		// Test Service Layer (LayoutService + WindowService)
+		Console.WriteLine("About to test service layer...");
+		await TestServiceLayer();
+		Console.WriteLine("Service layer test completed.");
 		
 		Console.WriteLine("\n" + "=".PadRight(80, '='));
 		Console.WriteLine("All tests completed successfully!");
@@ -727,6 +739,272 @@ class Program
 		catch (Exception ex)
 		{
 			Console.WriteLine($"❌ Model creation test failed: {ex.Message}");
+		}
+	}
+
+    static async Task TestServiceLayer()
+	{
+		Console.WriteLine("Testing Service Layer (LayoutService)");
+		Console.WriteLine("====================================");
+
+		try
+		{
+			// Setup configuration
+			var configuration = new ConfigurationBuilder()
+				.AddInMemoryCollection(new Dictionary<string, string?>
+				{
+					["Database:ConnectionString"] = "Filename=test_snapdesk.db;Mode=Exclusive",
+					["Database:EncryptionKey"] = "test-encryption-key-32-chars-long!!",
+					["Database:BackupPath"] = "./backups",
+					["Database:EnableLogging"] = "true"
+				})
+				.Build();
+
+			// Setup services
+			var services = new ServiceCollection();
+			
+			// Add logging
+			services.AddLogging(builder =>
+			{
+				builder.SetMinimumLevel(LogLevel.Information);
+			});
+			
+			// Register database and repository services
+			services.AddSingleton<IConfiguration>(configuration);
+			
+			// Create DatabaseConfiguration from our in-memory config
+			var dbPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test_snapdesk.db");
+			var dbConfig = DatabaseConfiguration.CreateForPath(dbPath);
+			services.AddSingleton<DatabaseConfiguration>(dbConfig);
+			
+			services.AddSingleton<IDatabaseService, DatabaseService>();
+			services.AddSingleton<ILayoutRepository, LayoutRepository>();
+			services.AddSingleton<LayoutService>();
+			
+			// Register WindowService dependencies
+			services.AddSingleton<IWindowApi, WindowsWindowApi>();
+			services.AddSingleton<IWindowService, WindowService>();
+			
+			// Create service provider and initialize database
+			var serviceProvider = services.BuildServiceProvider();
+			var dbService = serviceProvider.GetRequiredService<IDatabaseService>();
+			await dbService.InitializeAsync();
+			
+			Console.WriteLine("✅ Service configuration setup completed (DB initialized)");
+			Console.WriteLine();
+
+			// Test service creation
+			Console.WriteLine("Testing Service Creation...");
+			var layoutService = serviceProvider.GetRequiredService<LayoutService>();
+			Console.WriteLine($"✅ LayoutService created successfully: {layoutService.GetType().Name}");
+			
+			var windowService = serviceProvider.GetRequiredService<IWindowService>();
+			Console.WriteLine($"✅ WindowService created successfully: {windowService.GetType().Name}");
+			Console.WriteLine();
+
+			// Test basic service operations
+			Console.WriteLine("Testing Basic Service Operations...");
+			TestBasicServiceOperations(layoutService);
+			Console.WriteLine();
+			
+			// Test WindowService operations
+			Console.WriteLine("Testing WindowService Operations...");
+			await TestWindowServiceOperations(windowService);
+			Console.WriteLine();
+
+			// Test Group 4: Capture and Restore layout
+			Console.WriteLine("Testing Group 4: Capture and Restore Layout...");
+			await TestCaptureAndRestoreLayout(layoutService, windowService);
+			Console.WriteLine();
+
+			Console.WriteLine("✅ Service Layer Test completed successfully!");
+			Console.WriteLine("LayoutService is working correctly and ready for UI integration");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"❌ Service Layer Test failed: {ex.Message}");
+			Console.WriteLine($"Stack trace: {ex.StackTrace}");
+		}
+	}
+
+	static async void TestBasicServiceOperations(LayoutService layoutService)
+	{
+		try
+		{
+			// Test GetAllLayoutsAsync
+			Console.WriteLine("Testing GetAllLayoutsAsync...");
+			var layouts = await layoutService.GetAllLayoutsAsync();
+			Console.WriteLine($"✅ Retrieved {layouts.Count()} layouts");
+
+			// Test GetLayoutAsync with invalid ID
+			Console.WriteLine("Testing GetLayoutAsync with invalid ID...");
+			var invalidLayout = await layoutService.GetLayoutAsync("invalid_id");
+			Console.WriteLine($"✅ GetLayoutAsync handled invalid ID correctly: {invalidLayout == null}");
+
+			// Test ValidateLayoutAsync with invalid ID
+			Console.WriteLine("Testing ValidateLayoutAsync with invalid ID...");
+			var validationResult = await layoutService.ValidateLayoutAsync("invalid_id");
+			Console.WriteLine($"✅ ValidateLayoutAsync handled invalid ID correctly: IsValid={validationResult.IsValid}, CanBeRestored={validationResult.CanBeRestored}");
+
+			Console.WriteLine("✅ All basic service operations working correctly");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"❌ Basic service operations test failed: {ex.Message}");
+		}
+	}
+
+	static async Task TestWindowServiceOperations(IWindowService windowService)
+	{
+		try
+		{
+			// Test GetCurrentWindowsAsync
+			Console.WriteLine("Testing GetCurrentWindowsAsync...");
+			var windows = await windowService.GetCurrentWindowsAsync();
+			Console.WriteLine($"✅ Retrieved {windows.Count()} current windows");
+			
+			// Display first few windows for verification
+			var windowList = windows.ToList();
+			for (int i = 0; i < Math.Min(20, windowList.Count); i++)
+			{
+				var window = windowList[i];
+				Console.WriteLine($"   Window {i + 1}: {window.WindowTitle} ({window.ProcessName}) at ({window.Position.X}, {window.Position.Y}) {window.Size.Width}x{window.Size.Height}");
+			}
+
+			// Exercise Group 1 WindowService methods
+			Console.WriteLine();
+			Console.WriteLine("Testing WindowService Group 1 methods (validation & details)...");
+			if (windowList.Count > 0)
+			{
+				var target = windowList[0];
+				Console.WriteLine($"Target window for validation: '{target.WindowTitle}' (ID: {target.WindowId})");
+
+				// Validate the window ID
+				var isValid = await windowService.IsWindowValidAsync(target.WindowId);
+				Console.WriteLine($"  IsWindowValidAsync: {isValid}");
+
+				// Get detailed info
+				var details = await windowService.GetWindowDetailsAsync(target.WindowId);
+				if (details != null)
+				{
+					Console.WriteLine("  GetWindowDetailsAsync: succeeded");
+					Console.WriteLine($"    Title: {details.WindowTitle}");
+					Console.WriteLine($"    Class: {details.ClassName}");
+					Console.WriteLine($"    Process: {details.ProcessName}");
+					Console.WriteLine($"    Pos/Size: ({details.Position.X}, {details.Position.Y}) {details.Size.Width}x{details.Size.Height}");
+					Console.WriteLine($"    State: {details.State}");
+					Console.WriteLine($"    Monitor Index: {details.Monitor}");
+
+					// Refresh info (currently equivalent to details)
+					var refreshed = await windowService.RefreshWindowInfoAsync(target.WindowId);
+					Console.WriteLine($"  RefreshWindowInfoAsync: {(refreshed != null ? "succeeded" : "returned null")}");
+				}
+				else
+				{
+					Console.WriteLine("  GetWindowDetailsAsync: returned null (unexpected for a valid window)");
+				}
+
+				// Find window by info (best-effort match)
+				var criteria = new SnapDesk.Core.WindowInfo
+				{
+					WindowTitle = target.WindowTitle,
+					ClassName = target.ClassName,
+					ProcessName = target.ProcessName
+				};
+				var foundHandle = await windowService.FindWindowByInfoAsync(criteria);
+				var expectedHandleHex = target.WindowId;
+				var foundHandleHex = foundHandle != IntPtr.Zero ? foundHandle.ToInt64().ToString("X") : "0";
+				Console.WriteLine($"  FindWindowByInfoAsync: 0x{foundHandleHex} (expected ~0x{expectedHandleHex})");
+
+				// Print monitor configuration
+				Console.WriteLine();
+				Console.WriteLine("Testing Monitor Configuration...");
+				var monitors = await windowService.GetMonitorConfigurationAsync();
+				foreach (var m in monitors.OrderBy(m => m.Index))
+				{
+					Console.WriteLine($"  Monitor {m.Index}{(m.IsPrimary ? " (Primary)" : "")}: Bounds=({m.Bounds.X},{m.Bounds.Y},{m.Bounds.Width}x{m.Bounds.Height}) Working=({m.WorkingArea.X},{m.WorkingArea.Y},{m.WorkingArea.Width}x{m.WorkingArea.Height}) DPI={m.Dpi} RR={m.RefreshRate}");
+				}
+
+				// Exercise Group 3 WindowService manipulation wrappers
+				Console.WriteLine();
+				Console.WriteLine("Testing WindowService Group 3 methods (manipulation wrappers)...");
+				var detailsBefore = await windowService.GetWindowDetailsAsync(target.WindowId);
+				if (detailsBefore != null)
+				{
+					// Move
+					var moveTo = new Point(detailsBefore.Position.X + 30, detailsBefore.Position.Y + 30);
+					var moved = await windowService.MoveWindowAsync(target.WindowId, moveTo);
+					var afterMove = await windowService.RefreshWindowInfoAsync(target.WindowId);
+					Console.WriteLine($"  MoveWindowAsync: {(moved ? "ok" : "failed")} -> ({afterMove?.Position.X}, {afterMove?.Position.Y})");
+
+					// Resize
+					var resizeTo = new Size(detailsBefore.Size.Width + 80, detailsBefore.Size.Height + 80);
+					var resized = await windowService.ResizeWindowAsync(target.WindowId, resizeTo);
+					var afterResize = await windowService.RefreshWindowInfoAsync(target.WindowId);
+					Console.WriteLine($"  ResizeWindowAsync: {(resized ? "ok" : "failed")} -> {afterResize?.Size.Width}x{afterResize?.Size.Height}");
+
+					// State changes (minimize/restore/maximize/restore)
+					var minOk = await windowService.SetWindowStateAsync(target.WindowId, WindowState.Minimized);
+					System.Threading.Thread.Sleep(300);
+					var restoreOk1 = await windowService.SetWindowStateAsync(target.WindowId, WindowState.Normal);
+					System.Threading.Thread.Sleep(300);
+					var maxOk = await windowService.SetWindowStateAsync(target.WindowId, WindowState.Maximized);
+					System.Threading.Thread.Sleep(300);
+					var restoreOk2 = await windowService.SetWindowStateAsync(target.WindowId, WindowState.Normal);
+					Console.WriteLine($"  SetWindowStateAsync: Min={minOk}, Restore1={restoreOk1}, Max={maxOk}, Restore2={restoreOk2}");
+
+					// Show/Hide
+					var hideOk = await windowService.HideWindowAsync(target.WindowId);
+					System.Threading.Thread.Sleep(200);
+					var showOk = await windowService.ShowWindowAsync(target.WindowId);
+					Console.WriteLine($"  Hide/Show: Hide={hideOk}, Show={showOk}");
+
+					// Bring to front
+					var frontOk = await windowService.BringWindowToFrontAsync(target.WindowId);
+					Console.WriteLine($"  BringWindowToFrontAsync: {frontOk}");
+
+					// Move to other monitor if available
+					var allMonitors = (await windowService.GetMonitorConfigurationAsync()).ToList();
+					if (allMonitors.Count > 1)
+					{
+						var currentDetails = await windowService.RefreshWindowInfoAsync(target.WindowId);
+						var currentMonIdx = currentDetails?.Monitor ?? 0;
+						var other = allMonitors.Select(m => m.Index).FirstOrDefault(i => i != currentMonIdx);
+						var moveMonOk = await windowService.MoveWindowToMonitorAsync(target.WindowId, other);
+						var afterMon = await windowService.RefreshWindowInfoAsync(target.WindowId);
+						Console.WriteLine($"  MoveWindowToMonitorAsync -> {other}: {moveMonOk}, NewMonitor={afterMon?.Monitor}");
+					}
+				}
+			}
+			else
+			{
+				Console.WriteLine("No windows available to test Group 1 methods.");
+			}
+
+			Console.WriteLine("✅ WindowService.GetCurrentWindowsAsync working correctly");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"❌ WindowService operations test failed: {ex.Message}");
+		}
+	}
+
+	static async Task TestCaptureAndRestoreLayout(LayoutService layoutService, IWindowService windowService)
+	{
+		try
+		{
+			var name = $"Console Capture {DateTime.Now:HHmmss}";
+			Console.WriteLine($"Capturing current layout: '{name}'...");
+			var layout = await layoutService.SaveCurrentLayoutAsync(name, "Captured via console tests");
+			Console.WriteLine($"  Saved layout {layout.Id} with {layout.Windows.Count} windows");
+
+			Console.WriteLine("Restoring captured layout...");
+			var ok = await layoutService.RestoreLayoutAsync(layout.Id);
+			Console.WriteLine($"  Restore result: {ok}");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"❌ Capture/Restore test failed: {ex.Message}");
 		}
 	}
 

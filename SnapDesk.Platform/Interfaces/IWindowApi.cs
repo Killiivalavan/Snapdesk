@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using SnapDesk.Core;
+using SnapDesk.Shared;
 
 namespace SnapDesk.Platform.Interfaces;
 
@@ -257,45 +257,16 @@ public interface IWindowApi
 	/// <param name="error">Error message if operation fails</param>
 	/// <returns>True if successful, false otherwise</returns>
 	bool TrySetWindowTransparency(IntPtr hWnd, byte alpha, out string error);
-}
-
-/// <summary>
-/// Window style information for extended window properties.
-/// </summary>
-public class WindowStyle
-{
-	/// <summary>
-	/// Whether the window has a title bar.
-	/// </summary>
-	public bool HasTitleBar { get; set; }
 
 	/// <summary>
-	/// Whether the window has a system menu.
+	/// Gets all top-level windows on the desktop.
 	/// </summary>
-	public bool HasSystemMenu { get; set; }
+	/// <returns>List of window handles for all top-level windows</returns>
+	List<IntPtr> GetAllWindows();
 
 	/// <summary>
-	/// Whether the window can be resized.
+	/// Enumerates all monitors and returns platform-level descriptors.
+	/// Order defines monitor indices (0..n-1), primary flagged accordingly.
 	/// </summary>
-	public bool CanResize { get; set; }
-
-	/// <summary>
-	/// Whether the window can be minimized.
-	/// </summary>
-	public bool CanMinimize { get; set; }
-
-	/// <summary>
-	/// Whether the window can be maximized.
-	/// </summary>
-	public bool CanMaximize { get; set; }
-
-	/// <summary>
-	/// Whether the window is a tool window (doesn't appear in taskbar).
-	/// </summary>
-	public bool IsToolWindow { get; set; }
-
-	/// <summary>
-	/// Whether the window is always on top.
-	/// </summary>
-	public bool IsAlwaysOnTop { get; set; }
+	List<SnapDesk.Platform.Common.MonitorDescriptor> GetAllMonitors();
 }

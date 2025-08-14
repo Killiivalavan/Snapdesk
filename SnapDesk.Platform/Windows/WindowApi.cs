@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.Versioning;
 using System.Text;
-using SnapDesk.Core;
+using SnapDesk.Shared;
 using SnapDesk.Platform.Interfaces;
 using Vanara.PInvoke;
 
@@ -790,23 +790,51 @@ public static class WindowApi
 			return false;
 		}
 
-		try
-		{
-			// Show window using ShowWindow
-			var result = User32.ShowWindow(new HWND(hWnd), ShowWindowCommand.SW_SHOW);
-			if (!result)
-			{
-				error = "Failed to show window.";
-				return false;
-			}
+        try
+        {
+            // If minimized, restore first
+            if (IsWindowMinimized(hWnd))
+            {
+                if (!User32.ShowWindow(new HWND(hWnd), ShowWindowCommand.SW_RESTORE))
+                {
+                    // fallback to SW_SHOWNORMAL
+                    _ = User32.ShowWindow(new HWND(hWnd), ShowWindowCommand.SW_SHOWNORMAL);
+                }
+            }
 
-			return true;
-		}
-		catch (Exception ex)
-		{
-			error = $"Failed to show window: {ex.Message}";
-			return false;
-		}
+            // Primary show attempt
+            var shown = User32.ShowWindow(new HWND(hWnd), ShowWindowCommand.SW_SHOWNORMAL);
+
+            // If ShowWindow returned false, try SetWindowPos with SHOWWINDOW flag
+            if (!shown)
+            {
+                shown = User32.SetWindowPos(new HWND(hWnd), IntPtr.Zero, 0, 0, 0, 0,
+                    User32.SetWindowPosFlags.SWP_NOMOVE | User32.SetWindowPosFlags.SWP_NOSIZE | User32.SetWindowPosFlags.SWP_SHOWWINDOW);
+            }
+
+            // As a final nudge, try setting foreground (best-effort)
+            if (!shown)
+            {
+                _ = User32.SetForegroundWindow(new HWND(hWnd));
+            }
+
+            // Consider success if the window is now visible and not iconic
+            if (User32.IsWindowVisible(new HWND(hWnd)) && !User32.IsIconic(new HWND(hWnd)))
+                return true;
+
+            if (!shown)
+            {
+                error = "Failed to show window.";
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to show window: {ex.Message}";
+            return false;
+        }
 	}
 
 	/// <summary>
@@ -1018,6 +1046,35 @@ public static class WindowApi
 			error = $"Failed to set window transparency: {ex.Message}";
 			return false;
 		}
+	}
+
+	/// <summary>
+	/// Gets all top-level windows on the desktop using EnumWindows.
+	/// </summary>
+	/// <returns>List of window handles for all top-level windows</returns>
+	[SupportedOSPlatform("windows")]
+	public static List<IntPtr> GetAllWindows()
+	{
+		var windows = new List<IntPtr>();
+		
+		if (!OperatingSystem.IsWindows())
+			return windows;
+
+		try
+		{
+			// Use EnumWindows to enumerate all top-level windows
+			User32.EnumWindows((hWnd, lParam) =>
+			{
+				windows.Add((IntPtr)hWnd);
+				return true; // Continue enumeration
+			}, IntPtr.Zero);
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Failed to enumerate windows: {ex.Message}");
+		}
+
+		return windows;
 	}
 }
 

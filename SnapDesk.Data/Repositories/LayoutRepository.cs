@@ -316,126 +316,45 @@ public class LayoutRepository : RepositoryBase<LayoutProfile>, ILayoutRepository
             throw;
         }
     }
+
+    /// <summary>
+    /// Gets layouts by tags
+    /// </summary>
+    /// <param name="tags">Tags to search for</param>
+    /// <returns>Collection of layouts matching the tags</returns>
+    public async Task<IEnumerable<LayoutProfile>> GetByTagsAsync(IEnumerable<string> tags)
+    {
+        try
+        {
+            // Tags feature not yet implemented in LayoutProfile model
+            // Return empty collection for now
+            return new List<LayoutProfile>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get layouts by tags");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Gets all available tags from all layouts
+    /// </summary>
+    /// <returns>Collection of unique tags</returns>
+    public async Task<IEnumerable<string>> GetAllTagsAsync()
+    {
+        try
+        {
+            // Tags feature not yet implemented in LayoutProfile model
+            // Return empty collection for now
+            return new List<string>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get all tags");
+            throw;
+        }
+    }
 }
 
-/// <summary>
-/// Interface for layout repository operations
-/// </summary>
-public interface ILayoutRepository : IRepository<LayoutProfile>
-{
-    /// <summary>
-    /// Gets a layout by name
-    /// </summary>
-    Task<LayoutProfile?> GetByNameAsync(string name);
 
-    /// <summary>
-    /// Gets layouts by partial name match
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetByNamePatternAsync(string namePattern);
-
-    /// <summary>
-    /// Gets the currently active layout
-    /// </summary>
-    Task<LayoutProfile?> GetActiveLayoutAsync();
-
-    /// <summary>
-    /// Sets a layout as active
-    /// </summary>
-    Task<bool> SetActiveLayoutAsync(string id);
-
-    /// <summary>
-    /// Gets layouts created within a date range
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetByDateRangeAsync(DateTime startDate, DateTime endDate);
-
-    /// <summary>
-    /// Gets layouts updated since a specific date
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetUpdatedSinceAsync(DateTime since);
-
-    /// <summary>
-    /// Gets layouts with specific number of windows
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetByWindowCountAsync(int windowCount);
-
-    /// <summary>
-    /// Gets layouts that have hotkeys assigned
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetLayoutsWithHotkeysAsync();
-
-    /// <summary>
-    /// Gets the most recently created layouts
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetRecentLayoutsAsync(int count = 10);
-
-    /// <summary>
-    /// Gets the most frequently used layouts
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> GetFrequentlyUsedLayoutsAsync(int count = 10);
-
-    /// <summary>
-    /// Checks if a layout name already exists
-    /// </summary>
-    Task<bool> NameExistsAsync(string name, string? excludeId = null);
-
-    /// <summary>
-    /// Gets layout statistics
-    /// </summary>
-    new Task<LayoutStatistics> GetStatisticsAsync();
-
-    /// <summary>
-    /// Searches layouts by name and description
-    /// </summary>
-    Task<IEnumerable<LayoutProfile>> SearchAsync(string searchTerm);
-}
-
-/// <summary>
-/// Statistics about layouts
-/// </summary>
-public class LayoutStatistics
-{
-    /// <summary>
-    /// Total number of layouts
-    /// </summary>
-    public int TotalLayouts { get; set; }
-
-    /// <summary>
-    /// Number of active layouts
-    /// </summary>
-    public int ActiveLayouts { get; set; }
-
-    /// <summary>
-    /// Number of layouts with hotkeys
-    /// </summary>
-    public int LayoutsWithHotkeys { get; set; }
-
-    /// <summary>
-    /// Average number of windows per layout
-    /// </summary>
-    public double AverageWindowsPerLayout { get; set; }
-
-    /// <summary>
-    /// Name of the most recently created layout
-    /// </summary>
-    public string? MostRecentLayout { get; set; }
-
-    /// <summary>
-    /// Name of the oldest layout
-    /// </summary>
-    public string? OldestLayout { get; set; }
-
-    /// <summary>
-    /// Total number of windows across all layouts
-    /// </summary>
-    public int TotalWindows { get; set; }
-
-    /// <summary>
-    /// Number of layouts created today
-    /// </summary>
-    public int LayoutsCreatedToday { get; set; }
-
-    /// <summary>
-    /// Number of layouts updated today
-    /// </summary>
-    public int LayoutsUpdatedToday { get; set; }
-}

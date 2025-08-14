@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Versioning;
-using SnapDesk.Core;
+using SnapDesk.Shared;
 using SnapDesk.Platform.Interfaces;
 
 namespace SnapDesk.Platform.Windows;
@@ -263,5 +263,65 @@ public class WindowsWindowApi : IWindowApi
 	public bool TrySetWindowTransparency(IntPtr hWnd, byte alpha, out string error)
 	{
 		return WindowApi.TrySetWindowTransparency(hWnd, alpha, out error);
+	}
+
+	/// <summary>
+	/// Gets all top-level windows on the desktop.
+	/// </summary>
+	/// <returns>List of window handles for all top-level windows</returns>
+	public List<IntPtr> GetAllWindows()
+	{
+		return WindowApi.GetAllWindows();
+	}
+
+	/// <summary>
+	/// Enumerates all monitors and returns platform-level descriptors.
+	/// </summary>
+	public List<SnapDesk.Platform.Common.MonitorDescriptor> GetAllMonitors()
+	{
+		var result = new List<SnapDesk.Platform.Common.MonitorDescriptor>();
+		try
+		{
+			// Use Vanara to enum displays
+			var list = new List<(IntPtr hmon, Vanara.PInvoke.RECT rc, Vanara.PInvoke.RECT wa, bool primary)>();
+			Vanara.PInvoke.User32.EnumDisplayMonitors(IntPtr.Zero, null, (hMon, hdc, lprc, data) =>
+			{
+				Vanara.PInvoke.User32.MONITORINFOEX mi = new Vanara.PInvoke.User32.MONITORINFOEX();
+				mi.cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<Vanara.PInvoke.User32.MONITORINFOEX>();
+				if (Vanara.PInvoke.User32.GetMonitorInfo(hMon, ref mi))
+				{
+					list.Add(((IntPtr)hMon, mi.rcMonitor, mi.rcWork, (mi.dwFlags & Vanara.PInvoke.User32.MonitorInfoFlags.MONITORINFOF_PRIMARY) != 0));
+				}
+				return true;
+			}, IntPtr.Zero);
+
+			int index = 0;
+			foreach (var item in list)
+			{
+				var desc = new SnapDesk.Platform.Common.MonitorDescriptor
+				{
+					Handle = item.hmon,
+					Index = index++,
+					IsPrimary = item.primary,
+					BoundsX = item.rc.left,
+					BoundsY = item.rc.top,
+					BoundsWidth = item.rc.right - item.rc.left,
+					BoundsHeight = item.rc.bottom - item.rc.top,
+					WorkingX = item.wa.left,
+					WorkingY = item.wa.top,
+					WorkingWidth = item.wa.right - item.wa.left,
+					WorkingHeight = item.wa.bottom - item.wa.top,
+					Dpi = 96,
+					RefreshRate = 60,
+					Name = "Monitor"
+				};
+				result.Add(desc);
+			}
+		}
+		catch
+		{
+			// return empty on failure
+		}
+		return result;
 	}
 }

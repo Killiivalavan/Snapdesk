@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.Api", "SnapDesk.Ap
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.ConsoleTests", "SnapDesk.ConsoleTests\SnapDesk.ConsoleTests.csproj", "{782E6DA0-87BD-48F4-A47E-35AD4D4FABAC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapDesk.Shared", "SnapDesk.Shared\SnapDesk.Shared.csproj", "{AFFE95DA-9798-4D40-8244-9D420496FAB5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +50,9 @@ Global
 		{782E6DA0-87BD-48F4-A47E-35AD4D4FABAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{782E6DA0-87BD-48F4-A47E-35AD4D4FABAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{782E6DA0-87BD-48F4-A47E-35AD4D4FABAC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFFE95DA-9798-4D40-8244-9D420496FAB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFFE95DA-9798-4D40-8244-9D420496FAB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFFE95DA-9798-4D40-8244-9D420496FAB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFFE95DA-9798-4D40-8244-9D420496FAB5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

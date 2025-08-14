@@ -3,11 +3,13 @@
         xmlns:vm="using:SnapDesk.UI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
         x:Class="SnapDesk.UI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="SnapDesk.UI">
+        Title="SnapDesk - Desktop Layout Manager"
+        Width="900" Height="600"
+        MinWidth="800" MinHeight="500">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -15,6 +17,134 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <!-- Main Grid Layout -->
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*">
+        
+        <!-- Header Section with Title and Main Actions -->
+        <Border Grid.Row="0" Background="{DynamicResource SystemAccentColor}" Padding="20,15">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🖥️ SnapDesk" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text=" - Desktop Layout Manager" FontSize="16" Foreground="White" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <!-- Main Action Buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button Content="💾 Save Current Layout" 
+                            Command="{Binding SaveCurrentLayoutCommand}"
+                            IsEnabled="{Binding !IsLoading}"
+                            Background="White" Foreground="{DynamicResource SystemAccentColor}"
+                            Padding="15,8" FontWeight="SemiBold"/>
+                    
+                    <Button Content="🔄 Refresh" 
+                            Command="{Binding RefreshLayoutsCommand}"
+                            IsEnabled="{Binding !IsLoading}"
+                            Background="White" Foreground="{DynamicResource SystemAccentColor}"
+                            Padding="15,8" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+        </Border>
 
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1" ColumnDefinitions="300,*" Margin="20">
+            
+            <!-- Left Panel: Layout List -->
+            <Border Grid.Column="0" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" 
+                    CornerRadius="8" Padding="15" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="📋 Saved Layouts" FontSize="18" FontWeight="Bold" Margin="0,0,0,15"/>
+                    
+                    <!-- Layout List -->
+                    <ListBox ItemsSource="{Binding LayoutNames}" 
+                             SelectedItem="{Binding SelectedLayout}"
+                             MaxHeight="400">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
+                                        CornerRadius="6" Padding="12" Margin="0,2">
+                                    <TextBlock Text="{Binding}" FontWeight="SemiBold" FontSize="14"/>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    
+                    <!-- Layout Actions -->
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,15,0,0">
+                        <Button Content="▶️ Restore" 
+                                Command="{Binding RestoreLayoutCommand}"
+                                IsEnabled="{Binding SelectedLayout, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                                Padding="12,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                        
+                        <Button Content="🗑️ Delete" 
+                                Command="{Binding DeleteLayoutCommand}"
+                                IsEnabled="{Binding SelectedLayout, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                Background="Red" Foreground="White"
+                                Padding="12,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Right Panel: Layout Details -->
+            <Border Grid.Column="1" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" 
+                    CornerRadius="8" Padding="15" Margin="10,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="📊 Layout Details" FontSize="18" FontWeight="Bold" Margin="0,0,0,15"/>
+                    
+                    <!-- Layout Information -->
+                    <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
+                            CornerRadius="6" Padding="15" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="Select a layout from the list to view details" 
+                                       FontSize="14" HorizontalAlignment="Center" 
+                                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Selected Layout Info -->
+                    <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
+                            CornerRadius="6" Padding="15" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="Selected Layout:" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
+                            <TextBlock Text="{Binding SelectedLayout}" 
+                                       FontSize="16" Foreground="{DynamicResource SystemAccentColor}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Instructions -->
+                    <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
+                            CornerRadius="6" Padding="15">
+                        <StackPanel>
+                            <TextBlock Text="💡 How to use:" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
+                            <TextBlock Text="1. Click 'Save Current Layout' to capture your desktop arrangement" 
+                                       FontSize="12" Margin="0,2"/>
+                            <TextBlock Text="2. Select a layout from the list to restore it" 
+                                       FontSize="12" Margin="0,2"/>
+                            <TextBlock Text="3. Use the buttons to manage your saved layouts" 
+                                       FontSize="12" Margin="0,2"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Footer: Status Bar -->
+        <Border Grid.Row="2" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
+                Padding="20,10" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" 
+                BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" 
+                           VerticalAlignment="Center" FontSize="12"/>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <ProgressBar IsIndeterminate="True" Width="100" Height="4" 
+                                 IsVisible="{Binding IsLoading}"/>
+                    <TextBlock Text="Loading..." 
+                               IsVisible="{Binding IsLoading}" FontSize="11" 
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
