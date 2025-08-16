@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using SnapDesk.Core;
 using SnapDesk.Core.Interfaces;
 using SnapDesk.Data.Services;
+using LiteDB;
 
 namespace SnapDesk.Data.Repositories;
 
@@ -64,11 +65,11 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
     /// </summary>
     /// <param name="layoutId">Layout ID</param>
     /// <returns>Collection of hotkeys for the specified layout</returns>
-    public async Task<IEnumerable<HotkeyInfo>> GetByLayoutIdAsync(string layoutId)
+    public async Task<IEnumerable<HotkeyInfo>> GetByLayoutIdAsync(ObjectId layoutId)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(layoutId))
+            if (layoutId == ObjectId.Empty)
                 return new List<HotkeyInfo>();
 
             return await GetAsync(h => h.LayoutId == layoutId);
@@ -145,14 +146,14 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
     /// <param name="keys">Key combination to check</param>
     /// <param name="excludeId">Optional ID to exclude from conflict check</param>
     /// <returns>Collection of conflicting hotkeys</returns>
-    public async Task<IEnumerable<HotkeyInfo>> GetConflictingHotkeysAsync(string keys, string? excludeId = null)
+    public async Task<IEnumerable<HotkeyInfo>> GetConflictingHotkeysAsync(string keys, ObjectId? excludeId = null)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(keys))
                 return new List<HotkeyInfo>();
 
-            if (string.IsNullOrWhiteSpace(excludeId))
+            if (excludeId == null || excludeId == ObjectId.Empty)
             {
                 return await GetAsync(h => h.Keys == keys && h.IsEnabled);
             }
@@ -174,7 +175,7 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
     /// <param name="keys">Key combination to check</param>
     /// <param name="excludeId">Optional ID to exclude from availability check</param>
     /// <returns>True if key combination is available, false otherwise</returns>
-    public async Task<bool> IsKeyCombinationAvailableAsync(string keys, string? excludeId = null)
+    public async Task<bool> IsKeyCombinationAvailableAsync(string keys, ObjectId? excludeId = null)
     {
         try
         {
@@ -215,7 +216,7 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
     {
         try
         {
-            return await GetAsync(h => string.IsNullOrEmpty(h.LayoutId));
+            return await GetAsync(h => h.LayoutId == ObjectId.Empty);
         }
         catch (Exception ex)
         {
@@ -232,7 +233,7 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
     {
         try
         {
-            return await GetAsync(h => !string.IsNullOrEmpty(h.LayoutId));
+            return await GetAsync(h => h.LayoutId != ObjectId.Empty);
         }
         catch (Exception ex)
         {
@@ -265,11 +266,11 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
     /// </summary>
     /// <param name="layoutId">Layout ID to remove associations for</param>
     /// <returns>Number of hotkeys that had their association removed</returns>
-    public async Task<int> RemoveLayoutAssociationsAsync(string layoutId)
+    public async Task<int> RemoveLayoutAssociationsAsync(ObjectId layoutId)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(layoutId))
+            if (layoutId == ObjectId.Empty)
                 return 0;
 
             var associatedHotkeys = await GetByLayoutIdAsync(layoutId);
@@ -317,8 +318,8 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
                 TotalHotkeys = hotkeyList.Count,
                 EnabledHotkeys = hotkeyList.Count(h => h.IsEnabled),
                 DisabledHotkeys = hotkeyList.Count(h => !h.IsEnabled),
-                GlobalHotkeys = hotkeyList.Count(h => string.IsNullOrEmpty(h.LayoutId)),
-                LayoutSpecificHotkeys = hotkeyList.Count(h => !string.IsNullOrEmpty(h.LayoutId)),
+                GlobalHotkeys = hotkeyList.Count(h => h.LayoutId == ObjectId.Empty),
+                LayoutSpecificHotkeys = hotkeyList.Count(h => h.LayoutId != ObjectId.Empty),
                 ActionDistribution = actionGroups,
                 ModifierUsage = modifierGroups,
                 MostRecentHotkey = hotkeyList.OrderByDescending(h => h.CreatedAt).FirstOrDefault()?.Keys,
@@ -347,8 +348,7 @@ public class HotkeyRepository : RepositoryBase<HotkeyInfo>, IHotkeyRepository
 
             var allHotkeys = await GetAllAsync();
             return allHotkeys.Where(h => 
-                h.Keys.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                (!string.IsNullOrEmpty(h.LayoutId) && h.LayoutId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                h.Keys.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
             );
         }
         catch (Exception ex)
@@ -377,7 +377,7 @@ public interface IHotkeyRepository : IRepository<HotkeyInfo>
     /// <summary>
     /// Gets hotkeys associated with a specific layout
     /// </summary>
-    Task<IEnumerable<HotkeyInfo>> GetByLayoutIdAsync(string layoutId);
+    Task<IEnumerable<HotkeyInfo>> GetByLayoutIdAsync(ObjectId layoutId);
 
     /// <summary>
     /// Gets all enabled hotkeys
@@ -397,12 +397,12 @@ public interface IHotkeyRepository : IRepository<HotkeyInfo>
     /// <summary>
     /// Gets hotkeys that conflict with the specified key combination
     /// </summary>
-    Task<IEnumerable<HotkeyInfo>> GetConflictingHotkeysAsync(string keys, string? excludeId = null);
+    Task<IEnumerable<HotkeyInfo>> GetConflictingHotkeysAsync(string keys, ObjectId? excludeId = null);
 
     /// <summary>
     /// Checks if a key combination is available for use
     /// </summary>
-    Task<bool> IsKeyCombinationAvailableAsync(string keys, string? excludeId = null);
+    Task<bool> IsKeyCombinationAvailableAsync(string keys, ObjectId? excludeId = null);
 
     /// <summary>
     /// Gets hotkeys created within a date range
@@ -427,7 +427,7 @@ public interface IHotkeyRepository : IRepository<HotkeyInfo>
     /// <summary>
     /// Removes layout associations for hotkeys when a layout is deleted
     /// </summary>
-    Task<int> RemoveLayoutAssociationsAsync(string layoutId);
+    Task<int> RemoveLayoutAssociationsAsync(ObjectId layoutId);
 
     /// <summary>
     /// Gets hotkey statistics

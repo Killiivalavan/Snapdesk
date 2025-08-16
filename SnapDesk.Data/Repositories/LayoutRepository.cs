@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using SnapDesk.Core;
 using SnapDesk.Core.Interfaces;
 using SnapDesk.Data.Services;
+using LiteDB;
 
 namespace SnapDesk.Data.Repositories;
 
@@ -86,11 +87,11 @@ public class LayoutRepository : RepositoryBase<LayoutProfile>, ILayoutRepository
     /// </summary>
     /// <param name="id">Layout ID to activate</param>
     /// <returns>True if activation was successful</returns>
-    public async Task<bool> SetActiveLayoutAsync(string id)
+    public async Task<bool> SetActiveLayoutAsync(ObjectId id)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(id))
+            if (id == ObjectId.Empty)
                 return false;
 
             // First, deactivate all layouts
@@ -238,14 +239,14 @@ public class LayoutRepository : RepositoryBase<LayoutProfile>, ILayoutRepository
     /// <param name="name">Layout name to check</param>
     /// <param name="excludeId">Optional ID to exclude from the check</param>
     /// <returns>True if name exists, false otherwise</returns>
-    public async Task<bool> NameExistsAsync(string name, string? excludeId = null)
+    public async Task<bool> NameExistsAsync(string name, ObjectId? excludeId = null)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(name))
                 return false;
 
-            if (string.IsNullOrWhiteSpace(excludeId))
+            if (excludeId == null || excludeId == ObjectId.Empty)
             {
                 return await AnyAsync(l => l.Name == name);
             }

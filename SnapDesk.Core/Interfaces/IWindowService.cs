@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using SnapDesk.Shared;
+using LiteDB;
 
 namespace SnapDesk.Core.Interfaces;
 
@@ -64,7 +65,7 @@ public interface IWindowService
     /// <param name="windowId">Window identifier</param>
     /// <param name="position">New position</param>
     /// <returns>True if move was successful</returns>
-    Task<bool> MoveWindowAsync(string windowId, Point position);
+    Task<bool> MoveWindowAsync(ObjectId windowId, Point position);
 
     /// <summary>
     /// Resizes a window to new dimensions
@@ -72,7 +73,7 @@ public interface IWindowService
     /// <param name="windowId">Window identifier</param>
     /// <param name="size">New size</param>
     /// <returns>True if resize was successful</returns>
-    Task<bool> ResizeWindowAsync(string windowId, Size size);
+    Task<bool> ResizeWindowAsync(ObjectId windowId, Size size);
 
     /// <summary>
     /// Changes the state of a window (normal, minimized, maximized)
@@ -80,35 +81,35 @@ public interface IWindowService
     /// <param name="windowId">Window identifier</param>
     /// <param name="state">New window state</param>
     /// <returns>True if state change was successful</returns>
-    Task<bool> SetWindowStateAsync(string windowId, WindowState state);
+    Task<bool> SetWindowStateAsync(ObjectId windowId, WindowState state);
 
     /// <summary>
     /// Shows a hidden window
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>True if show was successful</returns>
-    Task<bool> ShowWindowAsync(string windowId);
+    Task<bool> ShowWindowAsync(ObjectId windowId);
 
     /// <summary>
     /// Hides a visible window
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>True if hide was successful</returns>
-    Task<bool> HideWindowAsync(string windowId);
+    Task<bool> HideWindowAsync(ObjectId windowId);
 
     /// <summary>
     /// Brings a window to the front (top of Z-order)
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>True if bring to front was successful</returns>
-    Task<bool> BringWindowToFrontAsync(string windowId);
+    Task<bool> BringWindowToFrontAsync(ObjectId windowId);
 
     /// <summary>
     /// Sends a window to the back (bottom of Z-order)
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>True if send to back was successful</returns>
-    Task<bool> SendWindowToBackAsync(string windowId);
+    Task<bool> SendWindowToBackAsync(ObjectId windowId);
 
     /// <summary>
     /// Moves a window to a different monitor
@@ -116,7 +117,7 @@ public interface IWindowService
     /// <param name="windowId">Window identifier</param>
     /// <param name="monitorIndex">Target monitor index</param>
     /// <returns>True if monitor move was successful</returns>
-    Task<bool> MoveWindowToMonitorAsync(string windowId, int monitorIndex);
+    Task<bool> MoveWindowToMonitorAsync(ObjectId windowId, int monitorIndex);
 
     /// <summary>
     /// Finds a window by its information
@@ -130,21 +131,21 @@ public interface IWindowService
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>Detailed window information if found, null otherwise</returns>
-    Task<WindowInfo?> GetWindowDetailsAsync(string windowId);
+    Task<WindowInfo?> GetWindowDetailsAsync(ObjectId windowId);
 
     /// <summary>
     /// Refreshes window information (updates positions, states, etc.)
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>Updated window information</returns>
-    Task<WindowInfo?> RefreshWindowInfoAsync(string windowId);
+    Task<WindowInfo?> RefreshWindowInfoAsync(ObjectId windowId);
 
     /// <summary>
     /// Checks if a window is still valid/exists
     /// </summary>
     /// <param name="windowId">Window identifier</param>
     /// <returns>True if window is valid</returns>
-    Task<bool> IsWindowValidAsync(string windowId);
+    Task<bool> IsWindowValidAsync(ObjectId windowId);
 
     /// <summary>
     /// Gets the current monitor configuration

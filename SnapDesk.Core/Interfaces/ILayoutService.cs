@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using LiteDB;
 
 namespace SnapDesk.Core.Interfaces;
 
@@ -29,7 +30,7 @@ public interface ILayoutService
     /// </summary>
     /// <param name="id">Layout ID</param>
     /// <returns>Layout profile if found, null otherwise</returns>
-    Task<LayoutProfile?> GetLayoutAsync(string id);
+    Task<LayoutProfile?> GetLayoutAsync(ObjectId id);
 
     /// <summary>
     /// Retrieves all saved layouts
@@ -50,14 +51,14 @@ public interface ILayoutService
     /// <param name="id">Layout ID to restore</param>
     /// <param name="options">Restoration options</param>
     /// <returns>True if restoration was successful</returns>
-    Task<bool> RestoreLayoutAsync(string id, RestoreOptions? options = null);
+    Task<bool> RestoreLayoutAsync(ObjectId id, RestoreOptions? options = null);
 
     /// <summary>
     /// Deletes a saved layout
     /// </summary>
     /// <param name="id">Layout ID to delete</param>
     /// <returns>True if deletion was successful</returns>
-    Task<bool> DeleteLayoutAsync(string id);
+    Task<bool> DeleteLayoutAsync(ObjectId id);
 
     /// <summary>
     /// Updates an existing layout
@@ -71,7 +72,7 @@ public interface ILayoutService
     /// </summary>
     /// <param name="id">Layout ID to activate</param>
     /// <returns>True if activation was successful</returns>
-    Task<bool> ActivateLayoutAsync(string id);
+    Task<bool> ActivateLayoutAsync(ObjectId id);
 
     /// <summary>
     /// Gets the currently active layout
@@ -85,7 +86,7 @@ public interface ILayoutService
     /// <param name="id">Layout ID to export</param>
     /// <param name="filePath">Export file path</param>
     /// <returns>True if export was successful</returns>
-    Task<bool> ExportLayoutAsync(string id, string filePath);
+    Task<bool> ExportLayoutAsync(ObjectId id, string filePath);
 
     /// <summary>
     /// Imports a layout from a file
@@ -100,14 +101,14 @@ public interface ILayoutService
     /// <param name="id">Layout ID to duplicate</param>
     /// <param name="newName">Name for the duplicate</param>
     /// <returns>New duplicated layout profile</returns>
-    Task<LayoutProfile> DuplicateLayoutAsync(string id, string newName);
+    Task<LayoutProfile> DuplicateLayoutAsync(ObjectId id, string newName);
 
     /// <summary>
     /// Validates if a layout can be restored
     /// </summary>
     /// <param name="id">Layout ID to validate</param>
     /// <returns>Validation result with details</returns>
-    Task<LayoutValidationResult> ValidateLayoutAsync(string id);
+    Task<LayoutValidationResult> ValidateLayoutAsync(ObjectId id);
 }
 
 /// <summary>

@@ -259,6 +259,19 @@ public interface IWindowApi
 	bool TrySetWindowTransparency(IntPtr hWnd, byte alpha, out string error);
 
 	/// <summary>
+	/// Attempts to set window position, size, and Z-order using SetWindowPos.
+	/// </summary>
+	/// <param name="hWnd">Window handle</param>
+	/// <param name="hWndInsertAfter">Window to insert after (use IntPtr(1) for HWND_BOTTOM, IntPtr(0) for HWND_TOP)</param>
+	/// <param name="x">New X coordinate (ignored if SWP_NOMOVE flag is set)</param>
+	/// <param name="y">New Y coordinate (ignored if SWP_NOMOVE flag is set)</param>
+	/// <param name="cx">New width (ignored if SWP_NOSIZE flag is set)</param>
+	/// <param name="cy">New height (ignored if SWP_NOSIZE flag is set)</param>
+	/// <param name="flags">SetWindowPos flags</param>
+	/// <returns>True if successful, false otherwise</returns>
+	bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, SetWindowPosFlags flags);
+
+	/// <summary>
 	/// Gets all top-level windows on the desktop.
 	/// </summary>
 	/// <returns>List of window handles for all top-level windows</returns>

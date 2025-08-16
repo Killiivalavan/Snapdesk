@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using SnapDesk.Core;
+using LiteDB;
 
 namespace SnapDesk.Core.Interfaces;
 
@@ -28,7 +29,7 @@ public interface ILayoutRepository : IRepository<LayoutProfile>
     /// <summary>
     /// Sets a layout as active
     /// </summary>
-    Task<bool> SetActiveLayoutAsync(string id);
+    Task<bool> SetActiveLayoutAsync(ObjectId id);
 
     /// <summary>
     /// Gets layouts created within a date range
@@ -63,7 +64,7 @@ public interface ILayoutRepository : IRepository<LayoutProfile>
     /// <summary>
     /// Checks if a layout name already exists
     /// </summary>
-    Task<bool> NameExistsAsync(string name, string? excludeId = null);
+    Task<bool> NameExistsAsync(string name, ObjectId? excludeId = null);
 
     /// <summary>
     /// Gets layout statistics

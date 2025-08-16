@@ -113,10 +113,7 @@ public class DatabaseInitializer
             _logger.LogInformation("Creating sample data...");
 
             // Create a sample layout
-            var sampleLayout = new LayoutProfile("Welcome Layout", "Default layout created by SnapDesk")
-            {
-                Id = "sample_layout_001"
-            };
+            var sampleLayout = new LayoutProfile("Welcome Layout", "Default layout created by SnapDesk");
 
             // Add sample windows
             sampleLayout.AddWindow(new WindowInfo("SnapDesk", "SnapDesk - Welcome", new Point(100, 100), new Size(1200, 800)));
@@ -129,10 +126,7 @@ public class DatabaseInitializer
             result.SampleLayoutCreated = true;
 
             // Create a sample global hotkey
-            var sampleHotkey = new HotkeyInfo("Ctrl+Alt+S", HotkeyAction.QuickSave)
-            {
-                Id = "sample_hotkey_001"
-            };
+            var sampleHotkey = new HotkeyInfo("Ctrl+Alt+S", HotkeyAction.QuickSave);
 
             await _hotkeyRepository.InsertAsync(sampleHotkey);
             result.SampleHotkeyCreated = true;

@@ -34,6 +34,8 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     public string DatabasePath => _configuration.DatabasePath;
 
+
+
     public DatabaseService(DatabaseConfiguration configuration, ILogger<DatabaseService> logger)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -74,6 +76,8 @@ public class DatabaseService : IDatabaseService, IDisposable
             throw;
         }
     }
+
+
 
     /// <summary>
     /// Connects to the database

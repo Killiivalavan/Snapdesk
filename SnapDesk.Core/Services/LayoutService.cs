@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SnapDesk.Core;
 using SnapDesk.Core.Interfaces;
+using LiteDB;
 
 namespace SnapDesk.Core.Services;
 
@@ -63,13 +64,13 @@ public class LayoutService : ILayoutService
     /// </summary>
     /// <param name="id">Layout ID</param>
     /// <returns>Layout profile if found, null otherwise</returns>
-    public async Task<LayoutProfile?> GetLayoutAsync(string id)
+    public async Task<LayoutProfile?> GetLayoutAsync(ObjectId id)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(id))
+            if (id == ObjectId.Empty)
             {
-                _logger.LogWarning("GetLayoutAsync called with null or empty ID");
+                _logger.LogWarning("GetLayoutAsync called with empty ID");
                 return null;
             }
 
@@ -90,13 +91,13 @@ public class LayoutService : ILayoutService
     /// </summary>
     /// <param name="id">Layout ID to delete</param>
     /// <returns>True if deletion was successful</returns>
-    public async Task<bool> DeleteLayoutAsync(string id)
+    public async Task<bool> DeleteLayoutAsync(ObjectId id)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(id))
+            if (id == ObjectId.Empty)
             {
-                _logger.LogWarning("DeleteLayoutAsync called with null or empty ID");
+                _logger.LogWarning("DeleteLayoutAsync called with empty ID");
                 return false;
             }
 
@@ -214,32 +215,7 @@ public class LayoutService : ILayoutService
         }
     }
 
-    /// <summary>
-    /// Activates a layout (sets it as the current active layout)
-    /// </summary>
-    /// <param name="id">Layout ID to activate</param>
-    /// <returns>True if activation was successful</returns>
-    public async Task<bool> ActivateLayoutAsync(string id)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                _logger.LogWarning("ActivateLayoutAsync called with null or empty ID");
-                return false;
-            }
 
-            _logger.LogInformation("Activating layout with ID: {Id}", id);
-            var result = await _layoutRepository.SetActiveLayoutAsync(id);
-            _logger.LogInformation("Layout activation result: {Success}", result);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to activate layout with ID: {Id}", id);
-            throw;
-        }
-    }
 
     // TODO: Implement remaining methods in next increment:
     // - SaveCurrentLayoutAsync (requires WindowService)
@@ -295,13 +271,13 @@ public class LayoutService : ILayoutService
     /// <param name="id">Layout ID to restore</param>
     /// <param name="options">Restoration options</param>
     /// <returns>True if restoration was successful</returns>
-    public async Task<bool> RestoreLayoutAsync(string id, RestoreOptions? options = null)
+    public async Task<bool> RestoreLayoutAsync(ObjectId id, RestoreOptions? options = null)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(id))
+            if (id == ObjectId.Empty)
             {
-                _logger.LogWarning("RestoreLayoutAsync called with null or empty ID");
+                _logger.LogWarning("RestoreLayoutAsync called with empty ID");
                 return false;
             }
 
@@ -328,41 +304,7 @@ public class LayoutService : ILayoutService
         }
     }
 
-    /// <summary>
-    /// Exports a layout to a file
-    /// </summary>
-    /// <param name="id">Layout ID to export</param>
-    /// <param name="filePath">Export file path</param>
-    /// <returns>True if export was successful</returns>
-    public async Task<bool> ExportLayoutAsync(string id, string filePath)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                _logger.LogWarning("ExportLayoutAsync called with null or empty ID");
-                return false;
-            }
 
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                _logger.LogWarning("ExportLayoutAsync called with null or empty file path");
-                return false;
-            }
-
-            _logger.LogInformation("Exporting layout with ID: {Id} to file: {FilePath}", id, filePath);
-            
-            // TODO: Implement file export logic
-            _logger.LogWarning("ExportLayoutAsync not fully implemented - requires file I/O operations");
-            
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to export layout with ID: {Id} to file: {FilePath}", id, filePath);
-            throw;
-        }
-    }
 
     /// <summary>
     /// Imports a layout from a file
@@ -393,73 +335,25 @@ public class LayoutService : ILayoutService
         }
     }
 
-    /// <summary>
-    /// Duplicates an existing layout
-    /// </summary>
-    /// <param name="id">Layout ID to duplicate</param>
-    /// <param name="newName">Name for the duplicate</param>
-    /// <returns>New duplicated layout profile</returns>
-    public async Task<LayoutProfile> DuplicateLayoutAsync(string id, string newName)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                _logger.LogWarning("DuplicateLayoutAsync called with null or empty ID");
-                throw new ArgumentException("Layout ID cannot be null or empty", nameof(id));
-            }
 
-            if (string.IsNullOrWhiteSpace(newName))
-            {
-                _logger.LogWarning("DuplicateLayoutAsync called with null or empty new name");
-                throw new ArgumentException("New name cannot be null or empty", nameof(newName));
-            }
-
-            _logger.LogInformation("Duplicating layout with ID: {Id} to new name: {NewName}", id, newName);
-            
-            // Get the original layout
-            var originalLayout = await _layoutRepository.GetByIdAsync(id);
-            if (originalLayout == null)
-            {
-                _logger.LogWarning("Original layout not found for duplication: {Id}", id);
-                throw new InvalidOperationException($"Layout with ID '{id}' not found");
-            }
-            
-            // Create duplicate with new name
-            var duplicateLayout = new LayoutProfile(newName, originalLayout.Description)
-            {
-                Windows = new List<WindowInfo>(originalLayout.Windows),
-                MonitorConfiguration = new List<MonitorInfo>(originalLayout.MonitorConfiguration),
-                IsActive = false // Duplicates are not active by default
-            };
-            
-            _logger.LogInformation("Created duplicate layout with ID: {Id}", duplicateLayout.Id);
-            return duplicateLayout;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to duplicate layout with ID: {Id} to new name: {NewName}", id, newName);
-            throw;
-        }
-    }
 
     /// <summary>
     /// Validates if a layout can be restored
     /// </summary>
     /// <param name="id">Layout ID to validate</param>
     /// <returns>Validation result with details</returns>
-    public async Task<LayoutValidationResult> ValidateLayoutAsync(string id)
+    public async Task<LayoutValidationResult> ValidateLayoutAsync(ObjectId id)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(id))
+            if (id == ObjectId.Empty)
             {
-                _logger.LogWarning("ValidateLayoutAsync called with null or empty ID");
+                _logger.LogWarning("ValidateLayoutAsync called with empty ID");
                 return new LayoutValidationResult
                 {
                     IsValid = false,
                     CanBeRestored = false,
-                    Errors = { "Layout ID cannot be null or empty" }
+                    Errors = { "Layout ID cannot be empty" }
                 };
             }
 
@@ -509,6 +403,147 @@ public class LayoutService : ILayoutService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to validate layout with ID: {Id}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Activates a layout (sets it as the current active layout)
+    /// </summary>
+    /// <param name="id">Layout ID to activate</param>
+    /// <returns>True if activation was successful</returns>
+    public async Task<bool> ActivateLayoutAsync(ObjectId id)
+    {
+        try
+        {
+            if (id == ObjectId.Empty)
+            {
+                _logger.LogWarning("ActivateLayoutAsync called with empty ID");
+                return false;
+            }
+
+            _logger.LogInformation("Activating layout with ID: {Id}", id);
+            
+            // Deactivate all other layouts first
+            var allLayouts = await _layoutRepository.GetAllAsync();
+            foreach (var layout in allLayouts)
+            {
+                if (layout.IsActive)
+                {
+                    layout.IsActive = false;
+                    await _layoutRepository.UpdateAsync(layout);
+                }
+            }
+            
+            // Activate the specified layout
+            var targetLayout = await _layoutRepository.GetByIdAsync(id);
+            if (targetLayout == null)
+            {
+                _logger.LogWarning("Layout not found for activation: {Id}", id);
+                return false;
+            }
+            
+            targetLayout.IsActive = true;
+            await _layoutRepository.UpdateAsync(targetLayout);
+            
+            _logger.LogInformation("Successfully activated layout with ID: {Id}", id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to activate layout with ID: {Id}", id);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Exports a layout to a file
+    /// </summary>
+    /// <param name="id">Layout ID to export</param>
+    /// <param name="filePath">Export file path</param>
+    /// <returns>True if export was successful</returns>
+    public async Task<bool> ExportLayoutAsync(ObjectId id, string filePath)
+    {
+        try
+        {
+            if (id == ObjectId.Empty)
+            {
+                _logger.LogWarning("ExportLayoutAsync called with empty ID");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                _logger.LogWarning("ExportLayoutAsync called with empty file path");
+                return false;
+            }
+
+            _logger.LogInformation("Exporting layout with ID: {Id} to file: {FilePath}", id, filePath);
+            
+            var layout = await _layoutRepository.GetByIdAsync(id);
+            if (layout == null)
+            {
+                _logger.LogWarning("Layout not found for export: {Id}", id);
+                return false;
+            }
+            
+            // TODO: Implement actual file export logic
+            _logger.LogInformation("Layout export not yet implemented for ID: {Id}", id);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export layout with ID: {Id}", id);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Duplicates an existing layout
+    /// </summary>
+    /// <param name="id">Layout ID to duplicate</param>
+    /// <param name="newName">Name for the duplicated layout</param>
+    /// <returns>Duplicated layout profile</returns>
+    public async Task<LayoutProfile> DuplicateLayoutAsync(ObjectId id, string newName)
+    {
+        try
+        {
+            if (id == ObjectId.Empty)
+            {
+                _logger.LogWarning("DuplicateLayoutAsync called with empty ID");
+                throw new ArgumentException("Layout ID cannot be empty", nameof(id));
+            }
+
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                _logger.LogWarning("DuplicateLayoutAsync called with empty new name");
+                throw new ArgumentException("New name cannot be empty", nameof(newName));
+            }
+
+            _logger.LogInformation("Duplicating layout with ID: {Id} to new name: {NewName}", id, newName);
+            
+            // Get the original layout
+            var originalLayout = await _layoutRepository.GetByIdAsync(id);
+            if (originalLayout == null)
+            {
+                _logger.LogWarning("Original layout not found for duplication: {Id}", id);
+                throw new InvalidOperationException($"Layout with ID '{id}' not found");
+            }
+            
+            // Create duplicate with new name
+            var duplicateLayout = new LayoutProfile(newName, originalLayout.Description)
+            {
+                Windows = new List<WindowInfo>(originalLayout.Windows),
+                MonitorConfiguration = new List<MonitorInfo>(originalLayout.MonitorConfiguration),
+                IsActive = false // Duplicates are not active by default
+            };
+            
+            _logger.LogInformation("Created duplicate layout with ID: {Id}", duplicateLayout.Id);
+            return duplicateLayout;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to duplicate layout with ID: {Id} to new name: {NewName}", id, newName);
             throw;
         }
     }

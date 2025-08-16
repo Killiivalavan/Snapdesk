@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using LiteDB;
 
 namespace SnapDesk.Core.Interfaces;
 
@@ -16,7 +17,7 @@ public interface IRepository<T> where T : class
     /// </summary>
     /// <param name="id">Entity identifier</param>
     /// <returns>Entity if found, null otherwise</returns>
-    Task<T?> GetByIdAsync(string id);
+    Task<T?> GetByIdAsync(ObjectId id);
 
     /// <summary>
     /// Gets all entities
@@ -70,7 +71,7 @@ public interface IRepository<T> where T : class
     /// </summary>
     /// <param name="id">Entity identifier</param>
     /// <returns>True if entity exists, false otherwise</returns>
-    Task<bool> ExistsAsync(string id);
+    Task<bool> ExistsAsync(ObjectId id);
 
     /// <summary>
     /// Checks if any entities match a predicate
@@ -125,7 +126,7 @@ public interface IRepository<T> where T : class
     /// </summary>
     /// <param name="id">Entity identifier</param>
     /// <returns>True if deletion was successful</returns>
-    Task<bool> DeleteAsync(string id);
+    Task<bool> DeleteAsync(ObjectId id);
 
     /// <summary>
     /// Deletes an entity

@@ -314,4 +314,21 @@ public class StubWindowApi : IWindowApi
 	{
 		return new List<MonitorDescriptor>();
 	}
+
+	/// <summary>
+	/// Attempts to set window position, size, and Z-order using SetWindowPos.
+	/// </summary>
+	/// <param name="hWnd">Window handle</param>
+	/// <param name="hWndInsertAfter">Window to insert after</param>
+	/// <param name="x">New X coordinate</param>
+	/// <param name="y">New Y coordinate</param>
+	/// <param name="cx">New width</param>
+	/// <param name="cy">New height</param>
+	/// <param name="flags">SetWindowPos flags</param>
+	/// <returns>False (not supported on this platform)</returns>
+	public bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, SetWindowPosFlags flags)
+	{
+		// Not supported on non-Windows platforms
+		return false;
+	}
 }

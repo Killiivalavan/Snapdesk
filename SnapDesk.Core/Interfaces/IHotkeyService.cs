@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using LiteDB;
 
 namespace SnapDesk.Core.Interfaces;
 
@@ -30,7 +31,7 @@ public interface IHotkeyService
     /// </summary>
     /// <param name="hotkeyId">ID of the hotkey to unregister</param>
     /// <returns>True if unregistration was successful</returns>
-    Task<bool> UnregisterHotkeyAsync(string hotkeyId);
+    Task<bool> UnregisterHotkeyAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Unregisters a hotkey by its key combination
@@ -57,7 +58,7 @@ public interface IHotkeyService
     /// </summary>
     /// <param name="hotkeyId">Hotkey ID</param>
     /// <returns>Hotkey information if found, null otherwise</returns>
-    Task<HotkeyInfo?> GetHotkeyAsync(string hotkeyId);
+    Task<HotkeyInfo?> GetHotkeyAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Gets hotkeys by action type
@@ -71,7 +72,7 @@ public interface IHotkeyService
     /// </summary>
     /// <param name="layoutId">Layout ID</param>
     /// <returns>Collection of hotkeys for the specified layout</returns>
-    Task<IEnumerable<HotkeyInfo>> GetHotkeysByLayoutAsync(string layoutId);
+    Task<IEnumerable<HotkeyInfo>> GetHotkeysByLayoutAsync(ObjectId layoutId);
 
     /// <summary>
     /// Updates an existing hotkey
@@ -85,14 +86,14 @@ public interface IHotkeyService
     /// </summary>
     /// <param name="hotkeyId">Hotkey ID to enable</param>
     /// <returns>True if enable was successful</returns>
-    Task<bool> EnableHotkeyAsync(string hotkeyId);
+    Task<bool> EnableHotkeyAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Disables a hotkey (temporarily prevents it from working)
     /// </summary>
     /// <param name="hotkeyId">Hotkey ID to disable</param>
     /// <returns>True if disable was successful</returns>
-    Task<bool> DisableHotkeyAsync(string hotkeyId);
+    Task<bool> DisableHotkeyAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Changes the key combination for an existing hotkey
@@ -100,7 +101,7 @@ public interface IHotkeyService
     /// <param name="hotkeyId">Hotkey ID</param>
     /// <param name="newKeyCombination">New key combination</param>
     /// <returns>True if change was successful</returns>
-    Task<bool> ChangeHotkeyKeysAsync(string hotkeyId, string newKeyCombination);
+    Task<bool> ChangeHotkeyKeysAsync(ObjectId hotkeyId, string newKeyCombination);
 
     /// <summary>
     /// Associates a hotkey with a layout
@@ -108,21 +109,21 @@ public interface IHotkeyService
     /// <param name="hotkeyId">Hotkey ID</param>
     /// <param name="layoutId">Layout ID to associate with</param>
     /// <returns>True if association was successful</returns>
-    Task<bool> AssociateHotkeyWithLayoutAsync(string hotkeyId, string layoutId);
+    Task<bool> AssociateHotkeyWithLayoutAsync(ObjectId hotkeyId, ObjectId layoutId);
 
     /// <summary>
     /// Removes the layout association from a hotkey
     /// </summary>
     /// <param name="hotkeyId">Hotkey ID</param>
     /// <returns>True if removal was successful</returns>
-    Task<bool> RemoveHotkeyLayoutAssociationAsync(string hotkeyId);
+    Task<bool> RemoveHotkeyLayoutAssociationAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Checks if a hotkey is currently active/enabled
     /// </summary>
     /// <param name="hotkeyId">Hotkey ID</param>
     /// <returns>True if hotkey is active</returns>
-    Task<bool> IsHotkeyActiveAsync(string hotkeyId);
+    Task<bool> IsHotkeyActiveAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Gets hotkey conflicts (multiple hotkeys with same key combination)
@@ -136,7 +137,7 @@ public interface IHotkeyService
     /// <param name="conflict">Conflict to resolve</param>
     /// <param name="preferredHotkeyId">ID of the preferred hotkey</param>
     /// <returns>True if conflict was resolved</returns>
-    Task<bool> ResolveHotkeyConflictAsync(HotkeyConflict conflict, string preferredHotkeyId);
+    Task<bool> ResolveHotkeyConflictAsync(HotkeyConflict conflict, ObjectId preferredHotkeyId);
 
     /// <summary>
     /// Gets hotkey usage statistics
@@ -149,7 +150,7 @@ public interface IHotkeyService
     /// </summary>
     /// <param name="hotkeyId">Hotkey ID that was used</param>
     /// <returns>True if recording was successful</returns>
-    Task<bool> RecordHotkeyUsageAsync(string hotkeyId);
+    Task<bool> RecordHotkeyUsageAsync(ObjectId hotkeyId);
 
     /// <summary>
     /// Validates hotkey configuration
@@ -181,6 +182,16 @@ public interface IHotkeyService
     /// </summary>
     /// <returns>True if resumption was successful</returns>
     Task<bool> ResumeHotkeysAsync();
+
+    /// <summary>
+    /// Resets the hotkey ID counter (useful for testing)
+    /// </summary>
+    void ResetHotkeyIdCounter();
+
+    /// <summary>
+    /// Clears all registered hotkeys and resets internal state (useful for testing)
+    /// </summary>
+    Task ClearAllHotkeysAsync();
 }
 
 /// <summary>
@@ -308,7 +319,7 @@ public class HotkeyValidationResult
     /// <summary>
     /// List of conflicting hotkeys if any
     /// </summary>
-    public List<string> ConflictingHotkeyIds { get; set; } = new();
+    public List<ObjectId> ConflictingHotkeyIds { get; set; } = new();
 
     /// <summary>
     /// Whether the key combination is supported by the system

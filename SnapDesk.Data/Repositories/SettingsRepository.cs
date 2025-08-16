@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SnapDesk.Core.Interfaces;
 using SnapDesk.Data.Services;
+using LiteDB;
 
 namespace SnapDesk.Data.Repositories;
 
@@ -448,7 +449,17 @@ public class AppSetting
     /// <summary>
     /// Unique identifier for the setting
     /// </summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public ObjectId Id { get; set; }
+
+    /// <summary>
+    /// Default constructor
+    /// </summary>
+    public AppSetting()
+    {
+        Id = ObjectId.NewObjectId(); // Generate a new ObjectId
+        CreatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 
     /// <summary>
     /// Setting key (unique)

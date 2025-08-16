@@ -43,13 +43,13 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
     /// </summary>
     /// <param name="id">Entity identifier</param>
     /// <returns>Entity if found, null otherwise</returns>
-    public virtual async Task<T?> GetByIdAsync(string id)
+    public virtual async Task<T?> GetByIdAsync(ObjectId id)
     {
         try
         {
             return await Task.Run(() =>
             {
-                if (string.IsNullOrWhiteSpace(id))
+                if (id == ObjectId.Empty)
                     return null;
 
                 return Collection.FindById(id);
@@ -240,13 +240,13 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
     /// </summary>
     /// <param name="id">Entity identifier</param>
     /// <returns>True if entity exists, false otherwise</returns>
-    public virtual async Task<bool> ExistsAsync(string id)
+    public virtual async Task<bool> ExistsAsync(ObjectId id)
     {
         try
         {
             return await Task.Run(() =>
             {
-                if (string.IsNullOrWhiteSpace(id))
+                if (id == ObjectId.Empty)
                     return false;
 
                 return Collection.Exists(Query.EQ("_id", id));
@@ -431,13 +431,13 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
     /// </summary>
     /// <param name="id">Entity identifier</param>
     /// <returns>True if deletion was successful</returns>
-    public virtual async Task<bool> DeleteAsync(string id)
+    public virtual async Task<bool> DeleteAsync(ObjectId id)
     {
         try
         {
             return await Task.Run(() =>
             {
-                if (string.IsNullOrWhiteSpace(id))
+                if (id == ObjectId.Empty)
                     return false;
 
                 return Collection.Delete(id);
