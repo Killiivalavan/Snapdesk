@@ -11,11 +11,8 @@
         Width="900" Height="600"
         MinWidth="800" MinHeight="500">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+    <!-- Design.DataContext removed to prevent startup crashes -->
+    <!-- The actual DataContext is set in code (look at App.axaml.cs) -->
 
     <!-- Main Grid Layout -->
     <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*">
@@ -55,14 +52,21 @@
                     <TextBlock Text="📋 Saved Layouts" FontSize="18" FontWeight="Bold" Margin="0,0,0,15"/>
                     
                     <!-- Layout List -->
-                    <ListBox ItemsSource="{Binding LayoutNames}" 
+                    <ListBox ItemsSource="{Binding Layouts}" 
                              SelectedItem="{Binding SelectedLayout}"
                              MaxHeight="400">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
                                         CornerRadius="6" Padding="12" Margin="0,2">
-                                    <TextBlock Text="{Binding}" FontWeight="SemiBold" FontSize="14"/>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                        <TextBlock Text="{Binding Description}" FontSize="11" 
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                   IsVisible="{Binding Description, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                        <TextBlock Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" FontSize="10" 
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseLowBrush}"/>
+                                    </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -106,9 +110,32 @@
                             CornerRadius="6" Padding="15" Margin="0,0,0,15">
                         <StackPanel>
                             <TextBlock Text="Selected Layout:" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
-                            <TextBlock Text="{Binding SelectedLayout}" 
+                            <TextBlock Text="{Binding SelectedLayout.Name}" 
                                        FontSize="16" Foreground="{DynamicResource SystemAccentColor}"
                                        HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedLayout.Description}" 
+                                       FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0"
+                                       IsVisible="{Binding SelectedLayout.Description, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                            <TextBlock Text="{Binding SelectedLayout.CreatedAt, StringFormat='Created: {0:g}'}" 
+                                       FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- System Status -->
+                    <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" 
+                            CornerRadius="6" Padding="15" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="🔧 System Status" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Database:" FontSize="11"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding DatabasePath}" FontSize="11"/>
+                                
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Hotkeys:" FontSize="11"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TotalHotkeys}" FontSize="11"/>
+                                
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Layouts:" FontSize="11"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalLayouts}" FontSize="11"/>
+                            </Grid>
                         </StackPanel>
                     </Border>
 

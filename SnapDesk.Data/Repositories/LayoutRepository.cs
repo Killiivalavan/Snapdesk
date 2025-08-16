@@ -323,13 +323,13 @@ public class LayoutRepository : RepositoryBase<LayoutProfile>, ILayoutRepository
     /// </summary>
     /// <param name="tags">Tags to search for</param>
     /// <returns>Collection of layouts matching the tags</returns>
-    public async Task<IEnumerable<LayoutProfile>> GetByTagsAsync(IEnumerable<string> tags)
+    public Task<IEnumerable<LayoutProfile>> GetByTagsAsync(IEnumerable<string> tags)
     {
         try
         {
             // Tags feature not yet implemented in LayoutProfile model
             // Return empty collection for now
-            return new List<LayoutProfile>();
+            return Task.FromResult<IEnumerable<LayoutProfile>>(new List<LayoutProfile>());
         }
         catch (Exception ex)
         {
@@ -342,13 +342,13 @@ public class LayoutRepository : RepositoryBase<LayoutProfile>, ILayoutRepository
     /// Gets all available tags from all layouts
     /// </summary>
     /// <returns>Collection of unique tags</returns>
-    public async Task<IEnumerable<string>> GetAllTagsAsync()
+    public Task<IEnumerable<string>> GetAllTagsAsync()
     {
         try
         {
             // Tags feature not yet implemented in LayoutProfile model
             // Return empty collection for now
-            return new List<string>();
+            return Task.FromResult<IEnumerable<string>>(new List<string>());
         }
         catch (Exception ex)
         {

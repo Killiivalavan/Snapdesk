@@ -63,7 +63,7 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
     }
 
     /// <summary>
-    /// Gets all entities
+    /// Gets all entities from the collection
     /// </summary>
     /// <returns>Collection of all entities</returns>
     public virtual async Task<IEnumerable<T>> GetAllAsync()
@@ -72,7 +72,7 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
         {
             return await Task.Run(() =>
             {
-                return Collection.FindAll().ToList();
+                return Collection.FindAll(); // Return IEnumerable directly, no .ToList()
             });
         }
         catch (Exception ex)
@@ -93,7 +93,7 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
         {
             return await Task.Run(() =>
             {
-                return Collection.Find(predicate).ToList();
+                return Collection.Find(predicate); // Return IEnumerable directly, no .ToList()
             });
         }
         catch (Exception ex)
@@ -117,7 +117,7 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
             {
                 var skip = (pageNumber - 1) * pageSize;
                 var totalItems = Collection.Count();
-                var items = Collection.FindAll().Skip(skip).Take(pageSize).ToList();
+                var items = Collection.FindAll().Skip(skip).Take(pageSize); // No .ToList() - return IEnumerable
                 var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
 
                 return new PaginatedResult<T>
@@ -152,7 +152,7 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
             {
                 var skip = (pageNumber - 1) * pageSize;
                 var totalItems = Collection.Count(predicate);
-                var items = Collection.Find(predicate).Skip(skip).Take(pageSize).ToList();
+                var items = Collection.Find(predicate).Skip(skip).Take(pageSize); // No .ToList() - return IEnumerable
                 var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
 
                 return new PaginatedResult<T>
@@ -167,7 +167,7 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get paged entities with predicate from collection: {Collection}", _collectionName);
+            _logger.LogError(ex, "Failed to get filtered and ordered entities from collection: {Collection}", _collectionName);
             throw;
         }
     }
@@ -188,11 +188,11 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
                 
                 if (ascending)
                 {
-                    return query.OrderBy(orderBy).ToList();
+                    return query.OrderBy(orderBy).ToEnumerable(); // Convert ILiteQueryable to IEnumerable
                 }
                 else
                 {
-                    return query.OrderByDescending(orderBy).ToList();
+                    return query.OrderByDescending(orderBy).ToEnumerable(); // Convert ILiteQueryable to IEnumerable
                 }
             });
         }
@@ -220,11 +220,11 @@ public abstract class RepositoryBase<T> : IRepository<T> where T : class
                 
                 if (ascending)
                 {
-                    return query.OrderBy(orderBy).ToList();
+                    return query.OrderBy(orderBy).ToEnumerable(); // Convert ILiteQueryable to IEnumerable
                 }
                 else
                 {
-                    return query.OrderByDescending(orderBy).ToList();
+                    return query.OrderByDescending(orderBy).ToEnumerable(); // Convert ILiteQueryable to IEnumerable
                 }
             });
         }

@@ -6,6 +6,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using SnapDesk.Core;
 using SnapDesk.Core.Interfaces;
+using SnapDesk.Core.Exceptions;
 using SnapDesk.Platform.Interfaces;
 using SnapDesk.Shared;
 using LiteDB;
@@ -152,10 +153,10 @@ public class WindowService : IWindowService
             
             var allWindows = await GetCurrentWindowsAsync();
             var processWindows = allWindows.Where(w => 
-                string.Equals(w.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                string.Equals(w.ProcessName, processName, StringComparison.OrdinalIgnoreCase));
+                // No .ToList() - return IEnumerable directly
 
-            _logger.LogDebug("Found {Count} windows for process {ProcessName}", processWindows.Count, processName);
+            _logger.LogDebug("Found {Count} windows for process {ProcessName}", processWindows.Count(), processName);
             return processWindows;
         }
         catch (Exception ex)
@@ -185,10 +186,10 @@ public class WindowService : IWindowService
             var allWindows = await GetCurrentWindowsAsync();
             var titleWindows = allWindows.Where(w => 
                 !string.IsNullOrWhiteSpace(w.WindowTitle) && 
-                w.WindowTitle.Contains(title, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                w.WindowTitle.Contains(title, StringComparison.OrdinalIgnoreCase));
+                // No .ToList() - return IEnumerable directly
 
-            _logger.LogDebug("Found {Count} windows with title containing '{Title}'", titleWindows.Count, title);
+            _logger.LogDebug("Found {Count} windows with title containing '{Title}'", titleWindows.Count(), title);
             return titleWindows;
         }
         catch (Exception ex)
@@ -217,10 +218,10 @@ public class WindowService : IWindowService
             
             var allWindows = await GetCurrentWindowsAsync();
             var classWindows = allWindows.Where(w => 
-                string.Equals(w.ClassName, className, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                string.Equals(w.ClassName, className, StringComparison.OrdinalIgnoreCase));
+                // No .ToList() - return IEnumerable directly
 
-            _logger.LogDebug("Found {Count} windows with class '{ClassName}'", classWindows.Count, className);
+            _logger.LogDebug("Found {Count} windows with class '{ClassName}'", classWindows.Count(), className);
             return classWindows;
         }
         catch (Exception ex)
@@ -370,18 +371,18 @@ public class WindowService : IWindowService
 
 
 
-    public async Task<IntPtr> FindWindowByInfoAsync(WindowInfo windowInfo)
+    public Task<IntPtr> FindWindowByInfoAsync(WindowInfo windowInfo)
     {
         try
         {
             if (windowInfo == null)
-                return IntPtr.Zero;
+                return Task.FromResult(IntPtr.Zero);
 
             // If a valid window ID is provided and points to a live window, return it immediately
             if (windowInfo.WindowId != ObjectId.Empty && TryParseWindowId(windowInfo.WindowId, out var parsedHandle))
             {
                 if (_windowApi.IsWindow(parsedHandle))
-                    return parsedHandle;
+                    return Task.FromResult(parsedHandle);
             }
 
             var handles = _windowApi.GetAllWindows();
@@ -427,15 +428,15 @@ public class WindowService : IWindowService
                 }
 
                 if (matches)
-                    return handle;
+                    return Task.FromResult(handle);
             }
 
-            return IntPtr.Zero;
+            return Task.FromResult(IntPtr.Zero);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to find window by info");
-            return IntPtr.Zero;
+            return Task.FromResult(IntPtr.Zero);
         }
     }
 
@@ -472,10 +473,30 @@ public class WindowService : IWindowService
         }
     }
 
-    public async Task<MonitorInfo?> GetPrimaryMonitorAsync()
+    /// <summary>
+    /// Gets the primary monitor information
+    /// </summary>
+    /// <returns>Primary monitor information</returns>
+    public async Task<MonitorInfo> GetPrimaryMonitorAsync()
     {
-        var monitors = (await GetMonitorConfigurationAsync()).ToList();
-        return monitors.FirstOrDefault(m => m.IsPrimary) ?? monitors.FirstOrDefault(m => m.Index == 0);
+        try
+        {
+            var monitors = await GetMonitorConfigurationAsync();
+            var primaryMonitor = monitors.FirstOrDefault(m => m.IsPrimary);
+            
+            if (primaryMonitor == null)
+            {
+                _logger.LogWarning("No primary monitor found, using first available monitor");
+                primaryMonitor = monitors.FirstOrDefault() ?? new MonitorInfo();
+            }
+            
+            return primaryMonitor;
+        		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to get primary monitor");
+			throw new SnapDeskException("Failed to get primary monitor", ex);
+		}
     }
 
     public async Task<MonitorInfo?> GetMonitorByIndexAsync(int index)
@@ -483,6 +504,7 @@ public class WindowService : IWindowService
         var monitors = await GetMonitorConfigurationAsync();
         return monitors.FirstOrDefault(m => m.Index == index);
     }
+    
     public async Task<IEnumerable<WindowInfo>> CaptureDesktopLayoutAsync()
     {
         var windows = await GetCurrentWindowsAsync();
@@ -500,7 +522,8 @@ public class WindowService : IWindowService
             _logger.LogDebug("Getting window statistics");
             
             var allWindows = await GetCurrentWindowsAsync();
-            var windowsList = allWindows.ToList();
+            // Materialize the collection only once for multiple operations
+            var windowsList = allWindows.ToList(); // This .ToList() is necessary for multiple operations
 
             var statistics = new WindowStatistics
             {
@@ -513,7 +536,7 @@ public class WindowService : IWindowService
                 UniqueProcesses = windowsList.Select(w => w.ProcessName).Distinct().Count()
             };
 
-            // Calculate most common process
+            // Calculate most common process - optimize by avoiding multiple enumerations
             var processGroups = windowsList
                 .GroupBy(w => w.ProcessName)
                 .OrderByDescending(g => g.Count())

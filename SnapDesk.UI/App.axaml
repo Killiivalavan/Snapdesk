@@ -5,9 +5,10 @@
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
-    <Application.DataTemplates>
+    <!-- ViewLocator temporarily removed to fix startup issues -->
+    <!-- <Application.DataTemplates>
         <local:ViewLocator/>
-    </Application.DataTemplates>
+    </Application.DataTemplates> -->
   
     <Application.Styles>
         <FluentTheme />

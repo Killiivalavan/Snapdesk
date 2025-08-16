@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SnapDesk.Core;
 using SnapDesk.Core.Interfaces;
+using SnapDesk.Platform.Interfaces;
+using SnapDesk.Core.Exceptions;
 using LiteDB;
 
 namespace SnapDesk.Core.Services;
@@ -40,27 +45,32 @@ public class LayoutService : ILayoutService
     // 3. DeleteLayoutAsync
 
     /// <summary>
-    /// Retrieves all saved layouts
+    /// Gets all layouts
     /// </summary>
-    /// <returns>Collection of all layout profiles</returns>
+    /// <returns>Collection of all layouts</returns>
     public async Task<IEnumerable<LayoutProfile>> GetAllLayoutsAsync()
     {
         try
         {
-            _logger.LogInformation("Retrieving all layouts");
+            _logger.LogDebug("Getting all layouts");
             var layouts = await _layoutRepository.GetAllAsync();
             _logger.LogInformation("Retrieved {Count} layouts", layouts.Count());
             return layouts;
         }
+        catch (DatabaseOperationException ex)
+        {
+            _logger.LogError(ex, "Database operation failed while getting all layouts: {Operation} on {Collection}", ex.Operation, ex.Collection);
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve all layouts");
-            throw;
+            _logger.LogError(ex, "Unexpected error occurred while getting all layouts");
+            throw new LayoutOperationException("Failed to retrieve layouts due to an unexpected error", ObjectId.Empty, ex);
         }
     }
 
     /// <summary>
-    /// Retrieves a layout by its unique identifier
+    /// Gets a layout by ID
     /// </summary>
     /// <param name="id">Layout ID</param>
     /// <returns>Layout profile if found, null otherwise</returns>
@@ -74,15 +84,27 @@ public class LayoutService : ILayoutService
                 return null;
             }
 
-            _logger.LogInformation("Retrieving layout with ID: {Id}", id);
+            _logger.LogDebug("Getting layout with ID: {Id}", id);
             var layout = await _layoutRepository.GetByIdAsync(id);
-            _logger.LogInformation("Layout retrieval result: {Found}", layout != null);
+            
+            if (layout == null)
+            {
+                _logger.LogWarning("Layout not found with ID: {Id}", id);
+                return null;
+            }
+
+            _logger.LogDebug("Successfully retrieved layout: {Name} with ID: {Id}", layout.Name, id);
             return layout;
+        }
+        catch (DatabaseOperationException ex)
+        {
+            _logger.LogError(ex, "Database operation failed while getting layout {Id}: {Operation} on {Collection}", id, ex.Operation, ex.Collection);
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve layout with ID: {Id}", id);
-            throw;
+            _logger.LogError(ex, "Unexpected error occurred while getting layout {Id}", id);
+            throw new LayoutOperationException($"Failed to retrieve layout {id} due to an unexpected error", id, ex);
         }
     }
 
@@ -114,10 +136,10 @@ public class LayoutService : ILayoutService
     }
 
     /// <summary>
-    /// Retrieves layouts by name (partial match)
+    /// Gets layouts by name (partial match)
     /// </summary>
-    /// <param name="name">Name to search for</param>
-    /// <returns>Matching layout profiles</returns>
+    /// <param name="name">Layout name to search for</param>
+    /// <returns>Collection of matching layouts</returns>
     public async Task<IEnumerable<LayoutProfile>> GetLayoutsByNameAsync(string name)
     {
         try
@@ -125,18 +147,23 @@ public class LayoutService : ILayoutService
             if (string.IsNullOrWhiteSpace(name))
             {
                 _logger.LogWarning("GetLayoutsByNameAsync called with null or empty name");
-                return new List<LayoutProfile>();
+                return Enumerable.Empty<LayoutProfile>();
             }
 
-            _logger.LogInformation("Searching layouts by name: {Name}", name);
-            var layouts = await _layoutRepository.GetByNamePatternAsync(name);
+            _logger.LogDebug("Getting layouts with name containing: {Name}", name);
+            var layouts = await _layoutRepository.GetAsync(l => l.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
             _logger.LogInformation("Found {Count} layouts matching name: {Name}", layouts.Count(), name);
             return layouts;
         }
+        catch (DatabaseOperationException ex)
+        {
+            _logger.LogError(ex, "Database operation failed while searching layouts by name '{Name}': {Operation} on {Collection}", name, ex.Operation, ex.Collection);
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to search layouts by name: {Name}", name);
-            throw;
+            _logger.LogError(ex, "Unexpected error occurred while searching layouts by name '{Name}'", name);
+            throw new LayoutOperationException($"Failed to search layouts by name '{name}' due to an unexpected error", ObjectId.Empty, ex);
         }
     }
 
@@ -226,10 +253,10 @@ public class LayoutService : ILayoutService
     // - ValidateLayoutAsync (validation logic)
 
     /// <summary>
-    /// Saves the current desktop layout with the specified name and description
+    /// Saves the current desktop layout
     /// </summary>
-    /// <param name="name">Name for the layout</param>
-    /// <param name="description">Optional description</param>
+    /// <param name="name">Layout name</param>
+    /// <param name="description">Optional layout description</param>
     /// <returns>Saved layout profile</returns>
     public async Task<LayoutProfile> SaveCurrentLayoutAsync(string name, string? description = null)
     {
@@ -238,19 +265,19 @@ public class LayoutService : ILayoutService
             if (string.IsNullOrWhiteSpace(name))
             {
                 _logger.LogWarning("SaveCurrentLayoutAsync called with null or empty name");
-                throw new ArgumentException("Layout name cannot be null or empty", nameof(name));
+                throw new ValidationException("Layout name cannot be null or empty", "name", name);
             }
 
             _logger.LogInformation("Saving current desktop layout with name: {Name}", name);
 
             // Capture current desktop windows and monitors
-            var windows = (await _windowService.CaptureDesktopLayoutAsync()).ToList();
-            var monitors = (await _windowService.GetMonitorConfigurationAsync()).ToList();
+            var windows = await _windowService.CaptureDesktopLayoutAsync();
+            var monitors = await _windowService.GetMonitorConfigurationAsync();
 
             var layout = new LayoutProfile(name, description)
             {
-                Windows = windows,
-                MonitorConfiguration = monitors
+                Windows = windows.ToList(), // Convert to List only when assigning to property
+                MonitorConfiguration = monitors.ToList() // Convert to List only when assigning to property
             };
 
             // Persist as a new layout
@@ -258,10 +285,20 @@ public class LayoutService : ILayoutService
             _logger.LogInformation("Saved layout with ID: {Id}, Windows: {Count}", layout.Id, layout.Windows.Count);
             return layout;
         }
+        catch (ValidationException)
+        {
+            // Re-throw validation exceptions as-is
+            throw;
+        }
+        catch (DatabaseOperationException ex)
+        {
+            _logger.LogError(ex, "Database operation failed while saving layout '{Name}': {Operation} on {Collection}", name, ex.Operation, ex.Collection);
+            throw new LayoutOperationException($"Failed to save layout '{name}' due to database error", ObjectId.Empty, ex);
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save current layout with name: {Name}", name);
-            throw;
+            _logger.LogError(ex, "Unexpected error occurred while saving layout '{Name}'", name);
+            throw new LayoutOperationException($"Failed to save layout '{name}' due to an unexpected error", ObjectId.Empty, ex);
         }
     }
 
@@ -318,20 +355,82 @@ public class LayoutService : ILayoutService
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 _logger.LogWarning("ImportLayoutAsync called with null or empty file path");
-                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
+                throw new ValidationException("File path cannot be null or empty", "filePath", filePath);
+            }
+
+            if (!File.Exists(filePath))
+            {
+                _logger.LogWarning("Import file does not exist: {FilePath}", filePath);
+                throw new FileOperationException($"Import file not found: {filePath}", "Import", filePath);
             }
 
             _logger.LogInformation("Importing layout from file: {FilePath}", filePath);
             
-            // TODO: Implement file import logic
-            _logger.LogWarning("ImportLayoutAsync not fully implemented - requires file I/O operations");
-            
-            throw new NotImplementedException("ImportLayoutAsync not yet implemented");
+            // Read and deserialize the layout file
+            var jsonContent = await File.ReadAllTextAsync(filePath);
+            if (string.IsNullOrWhiteSpace(jsonContent))
+            {
+                throw new FileOperationException("Import file is empty or contains no valid content", "Import", filePath);
+            }
+
+            var importOptions = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = true
+            };
+
+            var importedLayout = System.Text.Json.JsonSerializer.Deserialize<LayoutProfile>(jsonContent, importOptions);
+            if (importedLayout == null)
+            {
+                throw new FileOperationException("Failed to deserialize layout from import file", "Import", filePath);
+            }
+
+            // Validate the imported layout
+            if (string.IsNullOrWhiteSpace(importedLayout.Name))
+            {
+                throw new ValidationException("Imported layout must have a valid name", "Name", importedLayout.Name);
+            }
+
+            // Generate new ID and timestamps for the imported layout
+            importedLayout.Id = ObjectId.NewObjectId();
+            importedLayout.CreatedAt = DateTime.UtcNow;
+            importedLayout.UpdatedAt = DateTime.UtcNow;
+            importedLayout.IsActive = false; // Imported layouts are not active by default
+
+            // Ensure collections are initialized
+            importedLayout.Windows ??= new List<WindowInfo>();
+            importedLayout.MonitorConfiguration ??= new List<MonitorInfo>();
+
+            // Generate new IDs for all child objects to avoid conflicts
+            foreach (var window in importedLayout.Windows)
+            {
+                window.WindowId = ObjectId.NewObjectId();
+            }
+
+            _logger.LogInformation("Successfully imported layout '{Name}' with {WindowCount} windows from {FilePath}", 
+                importedLayout.Name, importedLayout.Windows.Count, filePath);
+
+            return importedLayout;
+        }
+        catch (ValidationException)
+        {
+            // Re-throw validation exceptions as-is
+            throw;
+        }
+        catch (FileOperationException)
+        {
+            // Re-throw file operation exceptions as-is
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to parse JSON from import file: {FilePath}", filePath);
+            throw new FileOperationException($"Invalid JSON format in import file: {ex.Message}", "Import", filePath, ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to import layout from file: {FilePath}", filePath);
-            throw;
+            throw new FileOperationException($"Failed to import layout from file: {filePath}", "Import", filePath, ex);
         }
     }
 
@@ -469,13 +568,13 @@ public class LayoutService : ILayoutService
             if (id == ObjectId.Empty)
             {
                 _logger.LogWarning("ExportLayoutAsync called with empty ID");
-                return false;
+                throw new ValidationException("Layout ID cannot be empty", "id", id);
             }
 
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 _logger.LogWarning("ExportLayoutAsync called with empty file path");
-                return false;
+                throw new ValidationException("Export file path cannot be empty", "filePath", filePath);
             }
 
             _logger.LogInformation("Exporting layout with ID: {Id} to file: {FilePath}", id, filePath);
@@ -484,17 +583,66 @@ public class LayoutService : ILayoutService
             if (layout == null)
             {
                 _logger.LogWarning("Layout not found for export: {Id}", id);
-                return false;
+                throw new ResourceNotFoundException($"Layout with ID '{id}' not found for export", "Layout", id);
             }
+
+            // Ensure the directory exists
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            // Create export data (clone to avoid modifying original)
+            var exportData = new LayoutProfile(layout.Name, layout.Description)
+            {
+                Windows = new List<WindowInfo>(layout.Windows),
+                MonitorConfiguration = new List<MonitorInfo>(layout.MonitorConfiguration),
+                Hotkey = layout.Hotkey != null ? new HotkeyInfo
+                {
+                    Keys = layout.Hotkey.Keys,
+                    Key = layout.Hotkey.Key,
+                    Action = layout.Hotkey.Action,
+                    IsEnabled = layout.Hotkey.IsEnabled
+                } : null
+            };
+
+            // Serialize to JSON with proper formatting
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            };
+
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(exportData, jsonOptions);
             
-            // TODO: Implement actual file export logic
-            _logger.LogInformation("Layout export not yet implemented for ID: {Id}", id);
-            return false;
+            // Write to file
+            await File.WriteAllTextAsync(filePath, jsonContent);
+            
+            _logger.LogInformation("Successfully exported layout '{Name}' with {WindowCount} windows to {FilePath}", 
+                layout.Name, layout.Windows.Count, filePath);
+            
+            return true;
+        }
+        catch (ValidationException)
+        {
+            // Re-throw validation exceptions as-is
+            throw;
+        }
+        catch (ResourceNotFoundException)
+        {
+            // Re-throw resource not found exceptions as-is
+            throw;
+        }
+        catch (DatabaseOperationException ex)
+        {
+            _logger.LogError(ex, "Database operation failed while exporting layout {Id}: {Operation} on {Collection}", id, ex.Operation, ex.Collection);
+            throw new LayoutOperationException($"Failed to export layout {id} due to database error", id, ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to export layout with ID: {Id}", id);
-            return false;
+            throw new LayoutOperationException($"Failed to export layout {id} due to an unexpected error", id, ex);
         }
     }
 

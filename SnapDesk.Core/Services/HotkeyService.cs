@@ -13,7 +13,7 @@ namespace SnapDesk.Core.Services;
 /// <summary>
 /// Service for managing global hotkey operations
 /// </summary>
-public class HotkeyService : IHotkeyService
+public class HotkeyService : IHotkeyService, IDisposable
 {
     private readonly IHotkeyApi _hotkeyApi;
     private readonly IRepository<HotkeyInfo> _hotkeyRepository;
@@ -22,6 +22,8 @@ public class HotkeyService : IHotkeyService
     private readonly Dictionary<ObjectId, Action> _syncCallbacks = new();
     private readonly Dictionary<ObjectId, int> _hotkeyIds = new();
     private int _nextHotkeyId = 1;
+    private bool _isSuspended = false;
+    private bool _disposed = false;
 
     /// <summary>
     /// Resets the hotkey ID counter (useful for testing)
@@ -37,6 +39,8 @@ public class HotkeyService : IHotkeyService
     /// </summary>
     public async Task ClearAllHotkeysAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             // Unregister all hotkeys from platform
@@ -66,23 +70,15 @@ public class HotkeyService : IHotkeyService
             _logger.LogError(ex, "Failed to clear all hotkeys");
         }
     }
-    private bool _isSuspended = false;
 
-    public HotkeyService(
-        IHotkeyApi hotkeyApi,
-        IRepository<HotkeyInfo> hotkeyRepository,
-        ILogger<HotkeyService> logger)
+    public HotkeyService(IHotkeyApi hotkeyApi, IRepository<HotkeyInfo> hotkeyRepository, ILogger<HotkeyService> logger)
     {
-        Console.WriteLine($"[CONSTRUCTOR] HotkeyService constructor called - Instance ID: {GetHashCode()}");
-        Console.WriteLine($"[CONSTRUCTOR] HotkeyApi type: {hotkeyApi?.GetType().Name}");
-        Console.WriteLine($"[CONSTRUCTOR] Repository type: {hotkeyRepository?.GetType().Name}");
-        Console.WriteLine($"[CONSTRUCTOR] Logger type: {logger?.GetType().Name}");
-        
-        _hotkeyApi = hotkeyApi ?? throw new ArgumentNullException(nameof(hotkeyApi));
-        _hotkeyRepository = hotkeyRepository ?? throw new ArgumentNullException(nameof(hotkeyRepository));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
-        Console.WriteLine($"[CONSTRUCTOR] HotkeyService instance {GetHashCode()} initialized successfully");
+		_hotkeyApi = hotkeyApi ?? throw new ArgumentNullException(nameof(hotkeyApi));
+		_hotkeyRepository = hotkeyRepository ?? throw new ArgumentNullException(nameof(hotkeyRepository));
+		_logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+		_logger.LogDebug("HotkeyService initialized with {HotkeyApiType} and {RepositoryType}", 
+			hotkeyApi.GetType().Name, hotkeyRepository.GetType().Name);
     }
 
     /// <summary>
@@ -93,6 +89,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if association was successful</returns>
     public async Task<bool> AssociateHotkeyWithLayoutAsync(ObjectId hotkeyId, ObjectId layoutId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty || layoutId == ObjectId.Empty)
@@ -130,6 +128,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if removal was successful</returns>
     public async Task<bool> RemoveHotkeyLayoutAssociationAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -167,6 +167,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if hotkey is active</returns>
     public async Task<bool> IsHotkeyActiveAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -201,6 +203,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Collection of hotkey conflicts</returns>
     public async Task<IEnumerable<HotkeyConflict>> GetHotkeyConflictsAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Getting hotkey conflicts");
@@ -241,50 +245,27 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if registration was successful</returns>
     public async Task<bool> RegisterHotkeyAsync(HotkeyInfo hotkey, Func<Task> callback)
     {
-        Console.WriteLine($"[METHOD] RegisterHotkeyAsync(Func<Task>) called - Instance ID: {GetHashCode()}");
-        Console.WriteLine($"[METHOD] Hotkey: {hotkey?.Keys ?? "NULL"}");
-        Console.WriteLine($"[METHOD] Callback type: {callback?.GetType().Name ?? "NULL"}");
+        ThrowIfDisposed();
         
         try
         {
-            Console.WriteLine($"[VALIDATION] Starting validation checks...");
-            Console.WriteLine($"[VALIDATION] Hotkey parameter: {(hotkey == null ? "NULL" : $"Valid - {hotkey.Keys}")}");
-            Console.WriteLine($"[VALIDATION] Callback parameter: {(callback == null ? "NULL" : $"Valid - {callback.GetType().Name}")}");
-            
             if (hotkey == null || callback == null)
             {
-                Console.WriteLine($"[VALIDATION] ❌ Validation FAILED - null parameters detected");
                 _logger.LogWarning("Hotkey or callback is null");
                 return false;
             }
             
-            Console.WriteLine($"[VALIDATION] ✅ Basic parameter validation passed");
-            Console.WriteLine($"[VALIDATION] Checking hotkey validity...");
-            Console.WriteLine($"[VALIDATION] Hotkey.IsValid(): {hotkey.IsValid()}");
-            Console.WriteLine($"[VALIDATION] Hotkey ID: {hotkey.Id}");
-            Console.WriteLine($"[VALIDATION] Hotkey Keys: {hotkey.Keys}");
-            Console.WriteLine($"[VALIDATION] Hotkey Modifiers: {hotkey.Modifiers}");
-            Console.WriteLine($"[VALIDATION] Hotkey Key: {hotkey.Key}");
-            
             if (!hotkey.IsValid())
             {
-                Console.WriteLine($"[VALIDATION] ❌ Validation FAILED - hotkey is not valid");
                 _logger.LogWarning("Hotkey is not valid: {HotkeyId}", hotkey.Id);
                 return false;
             }
             
-            Console.WriteLine($"[VALIDATION] ✅ Hotkey validity check passed");
-            Console.WriteLine($"[VALIDATION] Checking if service is suspended...");
-            Console.WriteLine($"[VALIDATION] Service suspended: {_isSuspended}");
-            
             if (_isSuspended)
             {
-                Console.WriteLine($"[VALIDATION] ❌ Validation FAILED - service is suspended");
                 _logger.LogInformation("Hotkey registration skipped - service is suspended");
                 return false;
             }
-            
-            Console.WriteLine($"[VALIDATION] ✅ Service suspension check passed");
 
             _logger.LogDebug("Registering hotkey: {HotkeyId} with keys: {Keys}", hotkey.Id, hotkey.Keys);
 
@@ -298,12 +279,10 @@ public class HotkeyService : IHotkeyService
             // Check if key combination is available
             var isAvailable = await IsHotkeyAvailableAsync(hotkey.Keys);
             _logger.LogDebug("Hotkey availability check for {Keys}: {IsAvailable}", hotkey.Keys, isAvailable);
-            Console.WriteLine($"[DEBUG] Hotkey availability check for {hotkey.Keys}: {isAvailable}");
             
             if (!isAvailable)
             {
                 _logger.LogWarning("Key combination {Keys} is not available", hotkey.Keys);
-                Console.WriteLine($"[WARNING] Key combination {hotkey.Keys} is not available");
                 return false;
             }
 
@@ -312,32 +291,21 @@ public class HotkeyService : IHotkeyService
             var modifiers = ConvertToPlatformModifiers(hotkey.Modifiers);
             var virtualKey = ConvertToVirtualKey(hotkey.Key);
 
-            _logger.LogDebug("Attempting to register hotkey: ID={PlatformId}, Modifiers={Modifiers}, VirtualKey=0x{VirtualKey:X}", 
-                platformId, modifiers, virtualKey);
-            Console.WriteLine($"[DEBUG] Attempting to register hotkey: ID={platformId}, Modifiers={modifiers}, VirtualKey=0x{virtualKey:X}");
-
-            // Register with platform API
+            // Register with platform
             if (!_hotkeyApi.TryRegisterHotkey(platformId, modifiers, virtualKey, out var error))
             {
-                _logger.LogError("Failed to register hotkey with platform: ID={PlatformId}, Modifiers={Modifiers}, VirtualKey=0x{VirtualKey:X}, Error={Error}", 
-                    platformId, modifiers, virtualKey, error);
-                Console.WriteLine($"[ERROR] Failed to register hotkey with platform: ID={platformId}, Modifiers={modifiers}, VirtualKey=0x{virtualKey:X}, Error={error}");
+                _logger.LogError("Failed to register hotkey with platform: ID={PlatformId}, Modifiers={Modifiers}, VirtualKey=0x{VirtualKey:X}, Error={Error}", platformId, modifiers, virtualKey, error);
                 return false;
             }
 
             // Store callback and mapping
-            Console.WriteLine($"[REGISTRATION] Storing callback and mapping...");
-            _asyncCallbacks[hotkey.Id] = callback;
             _hotkeyIds[hotkey.Id] = platformId;
-            Console.WriteLine($"[REGISTRATION] ✅ Callback and mapping stored successfully");
+            _asyncCallbacks[hotkey.Id] = callback;
 
-            // Save to repository
-            Console.WriteLine($"[REGISTRATION] Saving hotkey to database...");
+            // Save to database
             await _hotkeyRepository.InsertAsync(hotkey);
-            Console.WriteLine($"[REGISTRATION] ✅ Hotkey saved to database successfully");
 
             _logger.LogInformation("Successfully registered hotkey {HotkeyId} with platform ID {PlatformId}", hotkey.Id, platformId);
-            Console.WriteLine($"[REGISTRATION] 🎉 HOTKEY REGISTRATION COMPLETED SUCCESSFULLY!");
             return true;
         }
         catch (Exception ex)
@@ -355,50 +323,27 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if registration was successful</returns>
     public async Task<bool> RegisterHotkeyAsync(HotkeyInfo hotkey, Action callback)
     {
-        Console.WriteLine($"[METHOD] RegisterHotkeyAsync(Action) called - Instance ID: {GetHashCode()}");
-        Console.WriteLine($"[METHOD] Hotkey: {hotkey?.Keys ?? "NULL"}");
-        Console.WriteLine($"[METHOD] Callback type: {callback?.GetType().Name ?? "NULL"}");
+        ThrowIfDisposed();
         
         try
         {
-            Console.WriteLine($"[VALIDATION] Starting validation checks...");
-            Console.WriteLine($"[VALIDATION] Hotkey parameter: {(hotkey == null ? "NULL" : $"Valid - {hotkey.Keys}")}");
-            Console.WriteLine($"[VALIDATION] Callback parameter: {(callback == null ? "NULL" : $"Valid - {callback.GetType().Name}")}");
-            
             if (hotkey == null || callback == null)
             {
-                Console.WriteLine($"[VALIDATION] ❌ Validation FAILED - null parameters detected");
                 _logger.LogWarning("Hotkey or callback is null");
                 return false;
             }
             
-            Console.WriteLine($"[VALIDATION] ✅ Basic parameter validation passed");
-            Console.WriteLine($"[VALIDATION] Checking hotkey validity...");
-            Console.WriteLine($"[VALIDATION] Hotkey.IsValid(): {hotkey.IsValid()}");
-            Console.WriteLine($"[VALIDATION] Hotkey ID: {hotkey.Id}");
-            Console.WriteLine($"[VALIDATION] Hotkey Keys: {hotkey.Keys}");
-            Console.WriteLine($"[VALIDATION] Hotkey Modifiers: {hotkey.Modifiers}");
-            Console.WriteLine($"[VALIDATION] Hotkey Key: {hotkey.Key}");
-            
             if (!hotkey.IsValid())
             {
-                Console.WriteLine($"[VALIDATION] ❌ Validation FAILED - hotkey is not valid");
                 _logger.LogWarning("Hotkey is not valid: {HotkeyId}", hotkey.Id);
                 return false;
             }
             
-            Console.WriteLine($"[VALIDATION] ✅ Hotkey validity check passed");
-            Console.WriteLine($"[VALIDATION] Checking if service is suspended...");
-            Console.WriteLine($"[VALIDATION] Service suspended: {_isSuspended}");
-            
             if (_isSuspended)
             {
-                Console.WriteLine($"[VALIDATION] ❌ Validation FAILED - service is suspended");
                 _logger.LogInformation("Hotkey registration skipped - service is suspended");
                 return false;
             }
-            
-            Console.WriteLine($"[VALIDATION] ✅ Service suspension check passed");
 
             _logger.LogDebug("Registering hotkey: {HotkeyId} with keys: {Keys}", hotkey.Id, hotkey.Keys);
 
@@ -412,12 +357,10 @@ public class HotkeyService : IHotkeyService
             // Check if key combination is available
             var isAvailable = await IsHotkeyAvailableAsync(hotkey.Keys);
             _logger.LogDebug("Hotkey availability check for {Keys}: {IsAvailable}", hotkey.Keys, isAvailable);
-            Console.WriteLine($"[DEBUG] Hotkey availability check for {hotkey.Keys}: {isAvailable}");
             
             if (!isAvailable)
             {
                 _logger.LogWarning("Key combination {Keys} is not available", hotkey.Keys);
-                Console.WriteLine($"[WARNING] Key combination {hotkey.Keys} is not available");
                 return false;
             }
 
@@ -428,30 +371,23 @@ public class HotkeyService : IHotkeyService
 
             _logger.LogDebug("Attempting to register hotkey: ID={PlatformId}, Modifiers={Modifiers}, VirtualKey=0x{VirtualKey:X}", 
                 platformId, modifiers, virtualKey);
-            Console.WriteLine($"[DEBUG] Attempting to register hotkey: ID={platformId}, Modifiers={modifiers}, VirtualKey=0x{virtualKey:X}");
 
             // Register with platform API
             if (!_hotkeyApi.TryRegisterHotkey(platformId, modifiers, virtualKey, out var error))
             {
                 _logger.LogError("Failed to register hotkey with platform: ID={PlatformId}, Modifiers={Modifiers}, VirtualKey=0x{VirtualKey:X}, Error={Error}", 
                     platformId, modifiers, virtualKey, error);
-                Console.WriteLine($"[ERROR] Failed to register hotkey with platform: ID={platformId}, Modifiers={modifiers}, VirtualKey=0x{virtualKey:X}, Error={error}");
                 return false;
             }
 
             // Store callback and mapping
-            Console.WriteLine($"[REGISTRATION] Storing callback and mapping...");
             _syncCallbacks[hotkey.Id] = callback;
             _hotkeyIds[hotkey.Id] = platformId;
-            Console.WriteLine($"[REGISTRATION] ✅ Callback and mapping stored successfully");
 
             // Save to repository
-            Console.WriteLine($"[REGISTRATION] Saving hotkey to database...");
             await _hotkeyRepository.InsertAsync(hotkey);
-            Console.WriteLine($"[REGISTRATION] ✅ Hotkey saved to database successfully");
 
             _logger.LogInformation("Successfully registered hotkey {HotkeyId} with platform ID {PlatformId}", hotkey.Id, platformId);
-            Console.WriteLine($"[REGISTRATION] 🎉 HOTKEY REGISTRATION COMPLETED SUCCESSFULLY!");
             return true;
         }
         catch (Exception ex)
@@ -468,6 +404,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if unregistration was successful</returns>
     public async Task<bool> UnregisterHotkeyAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -516,6 +454,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if unregistration was successful</returns>
     public async Task<bool> UnregisterHotkeyByKeysAsync(string keyCombination)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (string.IsNullOrWhiteSpace(keyCombination))
@@ -550,70 +490,46 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if the hotkey is available</returns>
     public async Task<bool> IsHotkeyAvailableAsync(string keyCombination)
     {
-        Console.WriteLine($"[AVAILABILITY] IsHotkeyAvailableAsync called for: {keyCombination}");
-        Console.WriteLine($"[AVAILABILITY] Instance ID: {GetHashCode()}");
+        ThrowIfDisposed();
         
         try
         {
             if (string.IsNullOrWhiteSpace(keyCombination))
             {
-                Console.WriteLine($"[AVAILABILITY] ❌ Key combination is null or empty");
                 _logger.LogWarning("Key combination is null or empty");
                 return false;
             }
             
-            Console.WriteLine($"[AVAILABILITY] ✅ Key combination validation passed");
-
             // Check if already registered in our system
-            Console.WriteLine($"[AVAILABILITY] Checking database for existing hotkeys...");
             var allHotkeys = await _hotkeyRepository.GetAllAsync();
-            Console.WriteLine($"[AVAILABILITY] Found {allHotkeys.Count()} hotkeys in database");
             
             var existingHotkey = allHotkeys.FirstOrDefault(h => h.Keys == keyCombination);
             if (existingHotkey != null)
             {
-                Console.WriteLine($"[AVAILABILITY] ❌ Key combination {keyCombination} is already registered in database");
-                Console.WriteLine($"[AVAILABILITY] Existing hotkey ID: {existingHotkey.Id}, Action: {existingHotkey.Action}");
                 _logger.LogDebug("Key combination {Keys} is already registered", keyCombination);
                 return false;
             }
             
-            Console.WriteLine($"[AVAILABILITY] ✅ No database conflicts found");
-
             // Check platform-specific limitations
-            Console.WriteLine($"[AVAILABILITY] Checking platform support...");
             var systemInfo = _hotkeyApi.GetSystemInfo();
-            Console.WriteLine($"[AVAILABILITY] Platform supports global hotkeys: {systemInfo.SupportsGlobalHotkeys}");
-            Console.WriteLine($"[AVAILABILITY] Max hotkeys supported: {systemInfo.MaxHotkeyCount}");
             
             if (!systemInfo.SupportsGlobalHotkeys)
             {
-                Console.WriteLine($"[AVAILABILITY] ❌ Platform does not support global hotkeys");
                 _logger.LogDebug("Platform does not support global hotkeys");
                 return false;
             }
             
-            Console.WriteLine($"[AVAILABILITY] ✅ Platform support check passed");
-
             // Check if we've reached the platform limit
-            Console.WriteLine($"[AVAILABILITY] Checking hotkey count limits...");
-            Console.WriteLine($"[AVAILABILITY] Current hotkey count: {_hotkeyIds.Count}");
-            Console.WriteLine($"[AVAILABILITY] Max allowed: {systemInfo.MaxHotkeyCount}");
-            
             if (_hotkeyIds.Count >= systemInfo.MaxHotkeyCount)
             {
-                Console.WriteLine($"[AVAILABILITY] ❌ Maximum hotkey limit reached: {_hotkeyIds.Count}/{systemInfo.MaxHotkeyCount}");
                 _logger.LogDebug("Maximum hotkey limit reached: {Count}/{Max}", _hotkeyIds.Count, systemInfo.MaxHotkeyCount);
                 return false;
             }
             
-            Console.WriteLine($"[AVAILABILITY] ✅ Hotkey count limit check passed");
-            Console.WriteLine($"[AVAILABILITY] 🎯 RESULT: Key combination {keyCombination} is AVAILABLE");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AVAILABILITY] ❌ EXCEPTION: {ex.Message}");
             _logger.LogError(ex, "Failed to check hotkey availability for {Keys}", keyCombination);
             return false;
         }
@@ -625,6 +541,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Collection of registered hotkeys</returns>
     public async Task<IEnumerable<HotkeyInfo>> GetRegisteredHotkeysAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Getting registered hotkeys");
@@ -644,6 +562,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Hotkey information if found, null otherwise</returns>
     public async Task<HotkeyInfo?> GetHotkeyAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -669,6 +589,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Collection of hotkeys for the specified action</returns>
     public async Task<IEnumerable<HotkeyInfo>> GetHotkeysByActionAsync(HotkeyAction action)
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Getting hotkeys by action: {Action}", action);
@@ -689,6 +611,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Collection of hotkeys for the specified layout</returns>
     public async Task<IEnumerable<HotkeyInfo>> GetHotkeysByLayoutAsync(ObjectId layoutId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (layoutId == ObjectId.Empty)
@@ -715,6 +639,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if update was successful</returns>
     public async Task<bool> UpdateHotkeyAsync(HotkeyInfo hotkey)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkey == null)
@@ -786,6 +712,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if enable was successful</returns>
     public async Task<bool> EnableHotkeyAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -823,6 +751,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if disable was successful</returns>
     public async Task<bool> DisableHotkeyAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -861,6 +791,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if change was successful</returns>
     public async Task<bool> ChangeHotkeyKeysAsync(ObjectId hotkeyId, string newKeyCombination)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty || string.IsNullOrWhiteSpace(newKeyCombination))
@@ -924,6 +856,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if conflict was resolved</returns>
     public async Task<bool> ResolveHotkeyConflictAsync(HotkeyConflict conflict, ObjectId preferredHotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (conflict == null || preferredHotkeyId == ObjectId.Empty)
@@ -960,12 +894,15 @@ public class HotkeyService : IHotkeyService
     /// <returns>Statistics about hotkey usage</returns>
     public async Task<HotkeyStatistics> GetHotkeyStatisticsAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Getting hotkey statistics");
 
             var allHotkeys = await _hotkeyRepository.GetAllAsync();
-            var hotkeysList = allHotkeys.ToList();
+            // Materialize collection once for multiple operations
+            var hotkeysList = allHotkeys.ToList(); // This .ToList() is necessary for multiple Count() operations
 
             var statistics = new HotkeyStatistics
             {
@@ -994,6 +931,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if recording was successful</returns>
     public async Task<bool> RecordHotkeyUsageAsync(ObjectId hotkeyId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkeyId == ObjectId.Empty)
@@ -1030,6 +969,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Validation result with details</returns>
     public async Task<HotkeyValidationResult> ValidateHotkeyAsync(HotkeyInfo hotkey)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (hotkey == null)
@@ -1108,6 +1049,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>Information about system hotkey support</returns>
     public async Task<SystemHotkeyInfo> GetSystemHotkeyInfoAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Getting system hotkey information");
@@ -1137,13 +1080,15 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if refresh was successful</returns>
     public async Task<bool> RefreshHotkeysAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Refreshing all hotkey registrations");
 
             // Get all hotkeys from repository
             var allHotkeys = await _hotkeyRepository.GetAllAsync();
-            var enabledHotkeys = allHotkeys.Where(h => h.IsEnabled).ToList();
+            var enabledHotkeys = allHotkeys.Where(h => h.IsEnabled); // No .ToList() - use IEnumerable directly
 
             // Unregister all current platform registrations
             foreach (var platformId in _hotkeyIds.Values)
@@ -1158,14 +1103,16 @@ public class HotkeyService : IHotkeyService
             _nextHotkeyId = 1;
 
             // Re-register enabled hotkeys
+            var enabledCount = 0;
             foreach (var hotkey in enabledHotkeys)
             {
                 // Note: We can't re-register callbacks here since they're not stored
                 // This is a limitation - callbacks need to be re-registered by the caller
                 _logger.LogWarning("Hotkey {HotkeyId} needs callback re-registration after refresh", hotkey.Id);
+                enabledCount++;
             }
 
-            _logger.LogInformation("Successfully refreshed hotkey registrations. {Count} hotkeys need callback re-registration", enabledHotkeys.Count);
+            _logger.LogInformation("Successfully refreshed hotkey registrations. {Count} hotkeys need callback re-registration", enabledCount);
             return true;
         }
         catch (Exception ex)
@@ -1179,8 +1126,10 @@ public class HotkeyService : IHotkeyService
     /// Suspends all hotkey processing temporarily
     /// </summary>
     /// <returns>True if suspension was successful</returns>
-    public async Task<bool> SuspendHotkeysAsync()
+    public Task<bool> SuspendHotkeysAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Suspending hotkey processing");
@@ -1188,7 +1137,7 @@ public class HotkeyService : IHotkeyService
             if (_isSuspended)
             {
                 _logger.LogInformation("Hotkeys are already suspended");
-                return true;
+                return Task.FromResult(true);
             }
 
             _isSuspended = true;
@@ -1200,12 +1149,12 @@ public class HotkeyService : IHotkeyService
             }
 
             _logger.LogInformation("Successfully suspended hotkey processing");
-            return true;
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to suspend hotkey processing");
-            return false;
+            return Task.FromResult(false);
         }
     }
 
@@ -1215,6 +1164,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if resumption was successful</returns>
     public async Task<bool> ResumeHotkeysAsync()
     {
+        ThrowIfDisposed();
+        
         try
         {
             _logger.LogDebug("Resuming hotkey processing");
@@ -1263,6 +1214,8 @@ public class HotkeyService : IHotkeyService
     /// <returns>True if handled successfully</returns>
     public async Task<bool> HandleHotkeyPressAsync(int platformId)
     {
+        ThrowIfDisposed();
+        
         try
         {
             if (_isSuspended)
@@ -1392,5 +1345,67 @@ public class HotkeyService : IHotkeyService
             "F12" => 0x7B,
             _ => 0x00 // Unknown key
         };
+    }
+
+    /// <summary>
+    /// Disposes the service and cleans up all registered hotkeys
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Protected dispose method for derived classes
+    /// </summary>
+    /// <param name="disposing">True if called from Dispose, false if called from finalizer</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed && disposing)
+        {
+            try
+            {
+                // Unregister all hotkeys from platform
+                foreach (var platformId in _hotkeyIds.Values)
+                {
+                    _hotkeyApi.TryUnregisterHotkey(platformId, out _);
+                }
+
+                // Clear internal collections
+                _hotkeyIds.Clear();
+                _asyncCallbacks.Clear();
+                _syncCallbacks.Clear();
+
+                _logger.LogDebug("HotkeyService disposed - all hotkeys unregistered and collections cleared");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during HotkeyService disposal");
+            }
+            finally
+            {
+                _disposed = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finalizer to ensure cleanup if Dispose is not called
+    /// </summary>
+    ~HotkeyService()
+    {
+        Dispose(false);
+    }
+
+    /// <summary>
+    /// Throws ObjectDisposedException if the service has been disposed
+    /// </summary>
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(HotkeyService));
+        }
     }
 }

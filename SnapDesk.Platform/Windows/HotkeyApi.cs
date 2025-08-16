@@ -46,9 +46,9 @@ public static class HotkeyApi
 			return false;
 		}
 
-		if (virtualKey <= 0)
+		if (virtualKey <= 0 || virtualKey > 0xFF)
 		{
-			error = "Invalid virtual key code.";
+			error = "Invalid virtual key code. Must be in range 0x01-0xFF (1-255).";
 			return false;
 		}
 
