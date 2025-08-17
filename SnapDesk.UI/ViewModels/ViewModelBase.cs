@@ -2,6 +2,6 @@
 
 namespace SnapDesk.UI.ViewModels;
 
-public partial class ViewModelBase : ObservableObject
+public class ViewModelBase : ObservableObject
 {
 }

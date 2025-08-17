@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
     <PackageReference Include="Vanara.Core" Version="4.1.6" />
     <PackageReference Include="Vanara.PInvoke.User32" Version="4.1.6" />
+    <PackageReference Include="Vanara.PInvoke.ShCore" Version="4.1.6" />
   </ItemGroup>
 
   <ItemGroup>

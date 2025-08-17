@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.Versioning;
 using SnapDesk.Shared;
 using SnapDesk.Platform.Interfaces;
+using Vanara.PInvoke;
 
 namespace SnapDesk.Platform.Windows;
 
@@ -298,6 +299,9 @@ public class WindowsWindowApi : IWindowApi
 			int index = 0;
 			foreach (var item in list)
 			{
+				// Get actual DPI for this monitor
+				var actualDpi = GetMonitorDpi(item.hmon);
+				
 				var desc = new SnapDesk.Platform.Common.MonitorDescriptor
 				{
 					Handle = item.hmon,
@@ -311,9 +315,9 @@ public class WindowsWindowApi : IWindowApi
 					WorkingY = item.wa.top,
 					WorkingWidth = item.wa.right - item.wa.left,
 					WorkingHeight = item.wa.bottom - item.wa.top,
-					Dpi = 96,
-					RefreshRate = 60,
-					Name = "Monitor"
+					Dpi = actualDpi,
+					RefreshRate = 60, // TODO: Get actual refresh rate
+					Name = $"Monitor {index}" // TODO: Get actual monitor name
 				};
 				result.Add(desc);
 			}
@@ -351,6 +355,96 @@ public class WindowsWindowApi : IWindowApi
 		catch
 		{
 			return false;
+		}
+	}
+
+	/// <summary>
+	/// Gets the actual DPI for a specific monitor
+	/// </summary>
+	/// <param name="hMonitor">Monitor handle</param>
+	/// <returns>DPI value for the monitor, or 96 if detection fails</returns>
+	private static int GetMonitorDpi(IntPtr hMonitor)
+	{
+		// Note: Vanara.PInvoke.ShCore namespace is not available, using direct P/Invoke
+
+		try
+		{
+			// Fallback to direct P/Invoke
+			const int MDT_EFFECTIVE_DPI = 0;
+			var result = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, out uint dpiX, out uint dpiY);
+			if (result == 0) // S_OK
+			{
+				// Return the X DPI (usually X and Y are the same)
+				return (int)dpiX;
+			}
+			else
+			{
+				System.Diagnostics.Debug.WriteLine($"GetDpiForMonitor failed with result: {result}");
+			}
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Direct P/Invoke GetDpiForMonitor failed: {ex.Message}");
+		}
+
+		try
+		{
+			// Fallback to system DPI
+			using var hdc = Vanara.PInvoke.User32.GetDC(IntPtr.Zero);
+			if (!hdc.IsInvalid)
+			{
+				var dpi = Vanara.PInvoke.Gdi32.GetDeviceCaps(hdc, Vanara.PInvoke.Gdi32.DeviceCap.LOGPIXELSX);
+				if (dpi > 0)
+				{
+					System.Diagnostics.Debug.WriteLine($"Using system DPI fallback: {dpi}");
+					return dpi;
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"System DPI fallback failed: {ex.Message}");
+		}
+		
+		// Final fallback to standard DPI
+		System.Diagnostics.Debug.WriteLine($"All DPI detection methods failed, using default: 96");
+		return 96;
+	}
+
+	/// <summary>
+	/// P/Invoke declaration for GetDpiForMonitor (fallback method)
+	/// </summary>
+	[System.Runtime.InteropServices.DllImport("Shcore.dll")]
+	private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+	/// <summary>
+	/// Debug method to test DPI detection for all monitors
+	/// </summary>
+	public void DebugDpiDetection()
+	{
+		try
+		{
+			var monitors = GetAllMonitors();
+			System.Diagnostics.Debug.WriteLine($"=== DPI Detection Debug ===");
+			System.Diagnostics.Debug.WriteLine($"Found {monitors.Count} monitors");
+			
+			foreach (var monitor in monitors)
+			{
+				System.Diagnostics.Debug.WriteLine($"Monitor {monitor.Index}: Handle=0x{monitor.Handle.ToInt64():X}, DPI={monitor.Dpi}");
+				
+				// Test direct DPI detection
+				var directDpi = GetMonitorDpi(monitor.Handle);
+				System.Diagnostics.Debug.WriteLine($"  Direct DPI detection result: {directDpi}");
+				
+				// Test P/Invoke call directly
+				const int MDT_EFFECTIVE_DPI = 0;
+				var result = GetDpiForMonitor(monitor.Handle, MDT_EFFECTIVE_DPI, out uint dpiX, out uint dpiY);
+				System.Diagnostics.Debug.WriteLine($"  P/Invoke result: {result}, DPI X: {dpiX}, DPI Y: {dpiY}");
+			}
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"DPI Debug failed: {ex.Message}");
 		}
 	}
 }

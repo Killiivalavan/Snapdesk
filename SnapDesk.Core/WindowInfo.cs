@@ -66,6 +66,18 @@ public class WindowInfo
     public bool IsVisible { get; set; }
 
     /// <summary>
+    /// DPI (dots per inch) of the monitor where this window was saved
+    /// This is used for DPI-aware coordinate conversion during restoration
+    /// </summary>
+    [Range(72, 300)] // Reasonable DPI range
+    public int SavedDpi { get; set; }
+
+    /// <summary>
+    /// Monitor handle where this window was saved (for stable monitor identification)
+    /// </summary>
+    public IntPtr SavedMonitorHandle { get; set; }
+
+    /// <summary>
     /// Default constructor
     /// </summary>
     public WindowInfo()
@@ -77,6 +89,8 @@ public class WindowInfo
         Monitor = 0;
         ZOrder = 0;
         IsVisible = true;
+        SavedDpi = 96; // Default DPI
+        SavedMonitorHandle = IntPtr.Zero;
     }
 
     /// <summary>

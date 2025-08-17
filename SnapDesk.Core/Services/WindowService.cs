@@ -235,39 +235,113 @@ public class WindowService : IWindowService
     {
         if (window == null) return false;
         var handle = await FindWindowByInfoAsync(window);
-        if (handle == IntPtr.Zero) return false;
-
-        // Move/resize first, then apply state and visibility
-        var setBounds = _windowApi.TrySetWindowBounds(handle, window.Position.X, window.Position.Y, window.Size.Width, window.Size.Height, out var boundsErr);
-        if (!setBounds) _logger.LogWarning("Failed to set bounds during restore: {Error}", boundsErr);
-
-        // Set window state directly using platform API since we have the handle
-        bool stateOk = false;
-        string stateError = string.Empty;
-        switch (window.State)
+        if (handle == IntPtr.Zero) 
         {
-            case WindowState.Minimized:
-                stateOk = _windowApi.TryMinimizeWindow(handle, out stateError);
-                break;
-            case WindowState.Maximized:
-                stateOk = _windowApi.TryMaximizeWindow(handle, out stateError);
-                break;
-            default:
-                stateOk = _windowApi.TryRestoreWindow(handle, out stateError);
-                break;
+            _logger.LogWarning("Window not found for restoration: {ProcessName} - {Title}", 
+                window.ProcessName, window.WindowTitle);
+            return false;
         }
-        if (!stateOk) _logger.LogWarning("Failed to set state during restore for {Id}: {Error}", window.WindowId, stateError);
 
-        if (window.IsVisible)
+        _logger.LogDebug("Restoring window: {ProcessName} - {Title} to monitor {Monitor} with state {State}", 
+            window.ProcessName, window.WindowTitle, window.Monitor, window.State);
+
+        // Get current monitor DPI and convert coordinates if needed
+        var currentMonitorDpi = await GetCurrentMonitorDpiAsync(window.Monitor);
+        ConvertCoordinatesForDpi(
+            window.Position, window.Size,
+            window.SavedDpi > 0 ? window.SavedDpi : 96, // Use saved DPI or default
+            currentMonitorDpi,
+            out var convertedPosition, out var convertedSize);
+
+        // Handle window state restoration with proper order
+        bool success = true;
+        
+        if (window.State == WindowState.Maximized)
         {
-            _ = _windowApi.TryShowWindow(handle, out _);
+            // For maximized windows: restore to normal first, then maximize
+            // This prevents issues with bounds setting interfering with maximize
+            if (!_windowApi.TryRestoreWindow(handle, out var restoreError))
+            {
+                _logger.LogWarning("Failed to restore window before maximizing: {Error}", restoreError);
+            }
+            
+            // Set position/size for the normal state (important for cross-monitor moves)
+            if (!_windowApi.TrySetWindowBounds(handle, convertedPosition.X, convertedPosition.Y, 
+                convertedSize.Width, convertedSize.Height, out var boundsError))
+            {
+                _logger.LogWarning("Failed to set bounds before maximizing: {Error}", boundsError);
+                success = false;
+            }
+            
+            // Now maximize the window
+            if (!_windowApi.TryMaximizeWindow(handle, out var maxError))
+            {
+                _logger.LogWarning("Failed to maximize window: {Error}", maxError);
+                success = false;
+            }
+            else
+            {
+                _logger.LogDebug("Successfully maximized window on monitor {Monitor}", window.Monitor);
+            }
+        }
+        else if (window.State == WindowState.Minimized)
+        {
+            // For minimized windows: set bounds first, then minimize
+            if (!_windowApi.TrySetWindowBounds(handle, convertedPosition.X, convertedPosition.Y, 
+                convertedSize.Width, convertedSize.Height, out var boundsError))
+            {
+                _logger.LogWarning("Failed to set bounds before minimizing: {Error}", boundsError);
+                success = false;
+            }
+            
+            if (!_windowApi.TryMinimizeWindow(handle, out var minError))
+            {
+                _logger.LogWarning("Failed to minimize window: {Error}", minError);
+                success = false;
+            }
+            else
+            {
+                _logger.LogDebug("Successfully minimized window");
+            }
         }
         else
         {
-            _ = _windowApi.TryHideWindow(handle, out _);
+            // For normal windows: just restore state and set bounds
+            if (!_windowApi.TryRestoreWindow(handle, out var restoreError))
+            {
+                _logger.LogWarning("Failed to restore window to normal state: {Error}", restoreError);
+            }
+            
+            if (!_windowApi.TrySetWindowBounds(handle, convertedPosition.X, convertedPosition.Y, 
+                convertedSize.Width, convertedSize.Height, out var boundsError))
+            {
+                _logger.LogWarning("Failed to set bounds for normal window: {Error}", boundsError);
+                success = false;
+            }
+            else
+            {
+                _logger.LogDebug("Successfully restored normal window to position ({X},{Y}) size ({W}x{H})", 
+                    convertedPosition.X, convertedPosition.Y, convertedSize.Width, convertedSize.Height);
+            }
         }
 
-        return true;
+        // Handle visibility
+        if (window.IsVisible)
+        {
+            if (!_windowApi.TryShowWindow(handle, out var showError))
+            {
+                _logger.LogWarning("Failed to show window: {Error}", showError);
+            }
+        }
+        else
+        {
+            if (!_windowApi.TryHideWindow(handle, out var hideError))
+            {
+                _logger.LogWarning("Failed to hide window: {Error}", hideError);
+            }
+        }
+
+        return success;
     }
 
     public async Task<int> RestoreWindowsAsync(IEnumerable<WindowInfo> windows)
@@ -296,6 +370,19 @@ public class WindowService : IWindowService
                 window.State = _windowApi.IsWindowMinimized(handle) ? WindowState.Minimized : (_windowApi.IsWindowMaximized(handle) ? WindowState.Maximized : WindowState.Normal);
                 window.IsVisible = _windowApi.IsWindowVisible(handle);
                 window.Monitor = GetMonitorIndexForWindow(handle);
+                
+                // Capture DPI context for future restoration
+                var currentDpi = await GetCurrentMonitorDpiAsync(window.Monitor);
+                window.SavedDpi = currentDpi;
+                
+                // Store monitor handle for stable identification
+                if (_windowApi.TryGetWindowMonitor(handle, out var monitorHandle, out _))
+                {
+                    window.SavedMonitorHandle = monitorHandle;
+                    _logger.LogDebug("Captured DPI context: window on monitor {Monitor} with DPI {Dpi}", 
+                        window.Monitor, currentDpi);
+                }
+                
                 return true;
             }
             return false;
@@ -618,6 +705,7 @@ public class WindowService : IWindowService
         }
         catch { /* best-effort */ }
 
+        var monitorIndex = GetMonitorIndexForWindow(handle);
         var windowInfo = new WindowInfo
         {
             // WindowId will be auto-generated by LiteDB when saved
@@ -627,10 +715,18 @@ public class WindowService : IWindowService
             Position = position,
             Size = size,
             State = state,
-            Monitor = GetMonitorIndexForWindow(handle),
+            Monitor = monitorIndex,
             ZOrder = 0,
-            IsVisible = true
+            IsVisible = true,
+            SavedDpi = GetCurrentMonitorDpiAsync(monitorIndex).Result, // Capture current DPI
+            SavedMonitorHandle = IntPtr.Zero // Will be set if monitor handle is available
         };
+
+        // Store monitor handle for stable identification
+        if (_windowApi.TryGetWindowMonitor(handle, out var monitorHandle, out _))
+        {
+            windowInfo.SavedMonitorHandle = monitorHandle;
+        }
 
         return windowInfo;
     }
@@ -841,4 +937,80 @@ public class WindowService : IWindowService
             return false;
         }
     }
+
+    #region DPI-Aware Coordinate Conversion
+
+    /// <summary>
+    /// Converts window coordinates between different DPI contexts
+    /// </summary>
+    /// <param name="originalPosition">Original position in source DPI</param>
+    /// <param name="originalSize">Original size in source DPI</param>
+    /// <param name="sourceDpi">Source DPI (where the window was saved)</param>
+    /// <param name="targetDpi">Target DPI (where the window will be restored)</param>
+    /// <param name="convertedPosition">Converted position in target DPI</param>
+    /// <param name="convertedSize">Converted size in target DPI</param>
+    private void ConvertCoordinatesForDpi(
+        Point originalPosition, Size originalSize,
+        int sourceDpi, int targetDpi,
+        out Point convertedPosition, out Size convertedSize)
+    {
+        if (sourceDpi == targetDpi)
+        {
+            // No conversion needed
+            convertedPosition = originalPosition;
+            convertedSize = originalSize;
+            _logger.LogDebug("No DPI conversion needed: source={SourceDpi}, target={TargetDpi}", sourceDpi, targetDpi);
+            return;
+        }
+
+        // Calculate scaling factor
+        double scaleFactor = (double)targetDpi / sourceDpi;
+        
+        // Convert coordinates
+        convertedPosition = new Point(
+            (int)Math.Round(originalPosition.X * scaleFactor),
+            (int)Math.Round(originalPosition.Y * scaleFactor)
+        );
+        
+        convertedSize = new Size(
+            (int)Math.Round(originalSize.Width * scaleFactor),
+            (int)Math.Round(originalSize.Height * scaleFactor)
+        );
+
+        _logger.LogDebug("DPI conversion: {SourceDpi}→{TargetDpi} (scale={ScaleFactor:F3}): " +
+                        "pos({OriginalX},{OriginalY})→({ConvertedX},{ConvertedY}), " +
+                        "size({OriginalW}x{OriginalH})→({ConvertedW}x{ConvertedH})",
+            sourceDpi, targetDpi, scaleFactor,
+            originalPosition.X, originalPosition.Y, convertedPosition.X, convertedPosition.Y,
+            originalSize.Width, originalSize.Height, convertedSize.Width, convertedSize.Height);
+    }
+
+    /// <summary>
+    /// Gets the current DPI for a specific monitor
+    /// </summary>
+    /// <param name="monitorIndex">Monitor index</param>
+    /// <returns>DPI value for the monitor, or 96 if not found</returns>
+    private async Task<int> GetCurrentMonitorDpiAsync(int monitorIndex)
+    {
+        try
+        {
+            var monitors = await GetMonitorConfigurationAsync();
+            var monitor = monitors.FirstOrDefault(m => m.Index == monitorIndex);
+            if (monitor != null)
+            {
+                _logger.LogDebug("Found monitor {Index} with DPI {Dpi}", monitorIndex, monitor.Dpi);
+                return monitor.Dpi;
+            }
+            
+            _logger.LogWarning("Monitor {Index} not found, using default DPI", monitorIndex);
+            return 96; // Default DPI
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting DPI for monitor {Index}", monitorIndex);
+            return 96; // Default DPI
+        }
+    }
+
+    #endregion
 }
