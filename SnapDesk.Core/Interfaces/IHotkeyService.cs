@@ -189,6 +189,13 @@ public interface IHotkeyService
     void ResetHotkeyIdCounter();
 
     /// <summary>
+    /// Handles a hotkey press event from the platform message loop
+    /// </summary>
+    /// <param name="platformId">Platform hotkey ID</param>
+    /// <returns>True if handled successfully</returns>
+    Task<bool> HandleHotkeyPressAsync(int platformId);
+
+    /// <summary>
     /// Clears all registered hotkeys and resets internal state (useful for testing)
     /// </summary>
     Task ClearAllHotkeysAsync();

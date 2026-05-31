@@ -16,6 +16,7 @@ using SnapDesk.Data.Configuration;
 using SnapDesk.Data.Repositories;
 using SnapDesk.Platform.Interfaces;
 using SnapDesk.Platform.Common;
+using SnapDesk.Platform.Windows;
 using SnapDesk.Core;
 using System;
 using System.Collections.Generic;
@@ -27,6 +28,7 @@ namespace SnapDesk.UI;
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
+    private WindowsHotkeyMessageLoop? _hotkeyLoop;
     private static readonly string LogFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "SnapDesk",
@@ -158,6 +160,25 @@ public partial class App : Application
             var dbService = _serviceProvider.GetRequiredService<IDatabaseService>();
             await dbService.InitializeAsync();
             LogToFile("✓ Database initialized");
+
+            // Start hotkey message loop (Windows only)
+            LogToFile("Starting hotkey message loop...");
+            try
+            {
+                var hotkeyService = _serviceProvider.GetRequiredService<IHotkeyService>();
+                _hotkeyLoop = new WindowsHotkeyMessageLoop(
+                    (platformId) =>
+                    {
+                        _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                            hotkeyService.HandleHotkeyPressAsync(platformId));
+                    });
+                _hotkeyLoop.Start();
+                LogToFile("✓ Hotkey message loop started");
+            }
+            catch (Exception ex)
+            {
+                LogToFile($"⚠ Hotkey message loop not available: {ex.Message}");
+            }
             
             // Create main window with services
             LogToFile("Creating main window with services...");

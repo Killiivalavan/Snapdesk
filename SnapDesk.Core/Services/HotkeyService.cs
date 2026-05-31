@@ -1088,7 +1088,7 @@ public class HotkeyService : IHotkeyService, IDisposable
 
             // Get all hotkeys from repository
             var allHotkeys = await _hotkeyRepository.GetAllAsync();
-            var enabledHotkeys = allHotkeys.Where(h => h.IsEnabled); // No .ToList() - use IEnumerable directly
+            var enabledHotkeys = allHotkeys.Where(h => h.IsEnabled).ToList();
 
             // Unregister all current platform registrations
             foreach (var platformId in _hotkeyIds.Values)
@@ -1096,23 +1096,49 @@ public class HotkeyService : IHotkeyService, IDisposable
                 _hotkeyApi.TryUnregisterHotkey(platformId, out _);
             }
 
+            // Preserve existing callbacks before clearing
+            var existingAsyncCallbacks = new Dictionary<ObjectId, Func<Task>>(_asyncCallbacks);
+            var existingSyncCallbacks = new Dictionary<ObjectId, Action>(_syncCallbacks);
+
             // Clear local tracking
             _hotkeyIds.Clear();
             _asyncCallbacks.Clear();
             _syncCallbacks.Clear();
             _nextHotkeyId = 1;
 
-            // Re-register enabled hotkeys
-            var enabledCount = 0;
+            // Re-register enabled hotkeys with preserved callbacks
+            var registeredCount = 0;
             foreach (var hotkey in enabledHotkeys)
             {
-                // Note: We can't re-register callbacks here since they're not stored
-                // This is a limitation - callbacks need to be re-registered by the caller
-                _logger.LogWarning("Hotkey {HotkeyId} needs callback re-registration after refresh", hotkey.Id);
-                enabledCount++;
+                var platformId = _nextHotkeyId++;
+                var modifiers = ConvertToPlatformModifiers(hotkey.Modifiers);
+                var virtualKey = ConvertToVirtualKey(hotkey.Key);
+
+                if (!_hotkeyApi.TryRegisterHotkey(platformId, modifiers, virtualKey, out var error))
+                {
+                    _logger.LogWarning("Failed to re-register hotkey {HotkeyId} during refresh: {Error}", hotkey.Id, error);
+                    continue;
+                }
+
+                _hotkeyIds[hotkey.Id] = platformId;
+
+                if (existingAsyncCallbacks.TryGetValue(hotkey.Id, out var asyncCb))
+                {
+                    _asyncCallbacks[hotkey.Id] = asyncCb;
+                }
+                else if (existingSyncCallbacks.TryGetValue(hotkey.Id, out var syncCb))
+                {
+                    _syncCallbacks[hotkey.Id] = syncCb;
+                }
+                else
+                {
+                    _logger.LogWarning("Hotkey {HotkeyId} re-registered but no callback available; caller must re-register", hotkey.Id);
+                }
+
+                registeredCount++;
             }
 
-            _logger.LogInformation("Successfully refreshed hotkey registrations. {Count} hotkeys need callback re-registration", enabledCount);
+            _logger.LogInformation("RefreshHotkeysAsync: re-registered {Count}/{Total} hotkeys", registeredCount, enabledHotkeys.Count);
             return true;
         }
         catch (Exception ex)
