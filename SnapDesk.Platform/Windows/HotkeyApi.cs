@@ -16,9 +16,15 @@ public static class HotkeyApi
 	// Track registered hotkeys for management and cleanup
 	private static readonly HashSet<int> _registeredHotkeys = new();
 	private static readonly object _lockObject = new();
+	private static IntPtr _hotkeyWindowHandle = IntPtr.Zero;
 
 	// Windows message constant for hotkey events
 	private const int WM_HOTKEY = 0x0312;
+
+	public static void SetHotkeyWindowHandle(IntPtr handle)
+	{
+		_hotkeyWindowHandle = handle;
+	}
 
 	/// <summary>
 	/// Attempts to register a global hotkey that will work system-wide.
@@ -68,7 +74,7 @@ public static class HotkeyApi
 			uint win32Modifiers = ConvertToWin32Modifiers(modifiers);
 
 			// Register the hotkey using Win32 API
-			bool success = User32.RegisterHotKey(IntPtr.Zero, id, (User32.HotKeyModifiers)win32Modifiers, (uint)virtualKey);
+			bool success = User32.RegisterHotKey((HWND)_hotkeyWindowHandle, id, (User32.HotKeyModifiers)win32Modifiers, (uint)virtualKey);
 			
 			if (!success)
 			{
@@ -123,7 +129,7 @@ public static class HotkeyApi
 		try
 		{
 			// Unregister the hotkey using Win32 API
-			bool success = User32.UnregisterHotKey(IntPtr.Zero, id);
+			bool success = User32.UnregisterHotKey((HWND)_hotkeyWindowHandle, id);
 			
 			if (!success)
 			{

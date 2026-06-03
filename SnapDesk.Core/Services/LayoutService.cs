@@ -685,8 +685,11 @@ public class LayoutService : ILayoutService
                 MonitorConfiguration = new List<MonitorInfo>(originalLayout.MonitorConfiguration),
                 IsActive = false // Duplicates are not active by default
             };
-            
-            _logger.LogInformation("Created duplicate layout with ID: {Id}", duplicateLayout.Id);
+
+            // Persist the duplicate to the database
+            await _layoutRepository.InsertAsync(duplicateLayout);
+
+            _logger.LogInformation("Created and saved duplicate layout with ID: {Id}", duplicateLayout.Id);
             return duplicateLayout;
         }
         catch (Exception ex)
