@@ -468,6 +468,9 @@ public class WindowService : IWindowService
             }
 
             var handles = _windowApi.GetAllWindows();
+            IntPtr bestHandle = IntPtr.Zero;
+            int bestScore = -1;
+
             foreach (var handle in handles)
             {
                 if (!_windowApi.IsWindow(handle))
@@ -483,37 +486,72 @@ public class WindowService : IWindowService
                     catch { processName = string.Empty; }
                 }
 
-                // Match all provided non-empty criteria (case-insensitive; title as contains)
-                var matches = true;
-                if (!string.IsNullOrWhiteSpace(windowInfo.WindowTitle))
-                {
-                    matches &= !string.IsNullOrEmpty(title) && title.IndexOf(windowInfo.WindowTitle, StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-                if (!string.IsNullOrWhiteSpace(windowInfo.ClassName))
-                {
-                    matches &= !string.IsNullOrEmpty(className) && className.Equals(windowInfo.ClassName, StringComparison.OrdinalIgnoreCase);
-                }
+                // Match process criteria (mandatory)
+                bool processMatches = false;
                 if (!string.IsNullOrWhiteSpace(windowInfo.ProcessName))
                 {
                     var providedProcess = windowInfo.ProcessName;
-                    bool procMatch;
                     if (TryParsePidPlaceholder(providedProcess, out var expectedPid))
                     {
-                        // Match by PID when placeholder format is provided
-                        procMatch = _windowApi.TryGetWindowProcessId(handle, out var actualPid, out _) && actualPid == expectedPid;
+                        processMatches = _windowApi.TryGetWindowProcessId(handle, out var actualPid, out _) && actualPid == expectedPid;
                     }
                     else
                     {
-                        procMatch = !string.IsNullOrEmpty(processName) && processName.Equals(providedProcess, StringComparison.OrdinalIgnoreCase);
+                        processMatches = !string.IsNullOrEmpty(processName) && processName.Equals(providedProcess, StringComparison.OrdinalIgnoreCase);
                     }
-                    matches &= procMatch;
+                }
+                else
+                {
+                    // If no process name is specified, we cannot match
+                    continue;
                 }
 
-                if (matches)
+                if (!processMatches)
+                    continue;
+
+                // Match class name criteria (mandatory if windowInfo.ClassName is provided)
+                if (!string.IsNullOrWhiteSpace(windowInfo.ClassName))
                 {
-                    _windowHandleMap[windowInfo.WindowId] = handle;
-                    return Task.FromResult(handle);
+                    bool classMatches = !string.IsNullOrEmpty(className) && className.Equals(windowInfo.ClassName, StringComparison.OrdinalIgnoreCase);
+                    if (!classMatches)
+                        continue;
                 }
+
+                // Calculate matching score for candidates
+                int score = 0;
+
+                // Title similarity scoring (optional, tiebreaker)
+                if (!string.IsNullOrWhiteSpace(windowInfo.WindowTitle) && !string.IsNullOrEmpty(title))
+                {
+                    if (title.Equals(windowInfo.WindowTitle, StringComparison.OrdinalIgnoreCase))
+                    {
+                        score += 100; // Exact match
+                    }
+                    else if (title.IndexOf(windowInfo.WindowTitle, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             windowInfo.WindowTitle.IndexOf(title, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        score += 50; // Substring match
+                    }
+                }
+
+                // Prefer handles that are not already mapped to another window ID
+                bool isAlreadyMapped = _windowHandleMap.ContainsValue(handle);
+                if (!isAlreadyMapped)
+                {
+                    score += 500;
+                }
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestHandle = handle;
+                }
+            }
+
+            if (bestHandle != IntPtr.Zero)
+            {
+                _windowHandleMap[windowInfo.WindowId] = bestHandle;
+                return Task.FromResult(bestHandle);
             }
 
             return Task.FromResult(IntPtr.Zero);
